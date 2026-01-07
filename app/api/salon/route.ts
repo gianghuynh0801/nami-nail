@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 
     const salons = await prisma.salon.findMany({
       where: { ownerId: session.user.id },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'asc' },
       include: {
         _count: {
           select: {

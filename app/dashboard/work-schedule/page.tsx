@@ -117,9 +117,11 @@ export default function WorkSchedulePage() {
       const res = await fetch('/api/salon')
       if (res.ok) {
         const data = await res.json()
-        setSalons(data.salons || [])
-        if (data.salons && data.salons.length > 0) {
-          setSelectedSalonId(data.salons[0].id)
+        const salonsList = data.salons || []
+        setSalons(salonsList)
+        // Always select the first salon if available
+        if (salonsList.length > 0 && !selectedSalonId) {
+          setSelectedSalonId(salonsList[0].id)
         }
       }
     } catch (error) {
@@ -343,19 +345,22 @@ export default function WorkSchedulePage() {
       {/* Filters */}
       <div className="bg-white rounded-lg shadow p-4 flex flex-col sm:flex-row gap-4">
         <select
-          value={selectedSalonId}
+          value={selectedSalonId || (salons.length > 0 ? salons[0].id : '')}
           onChange={(e) => {
             setSelectedSalonId(e.target.value)
             setSelectedStaffId('')
           }}
           className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-400 focus:border-transparent"
         >
-          <option value="">Tất cả chi nhánh</option>
-          {salons.map((salon) => (
-            <option key={salon.id} value={salon.id}>
-              {salon.name}
-            </option>
-          ))}
+          {salons.length > 0 ? (
+            salons.map((salon) => (
+              <option key={salon.id} value={salon.id}>
+                {salon.name}
+              </option>
+            ))
+          ) : (
+            <option value="">Không có chi nhánh</option>
+          )}
         </select>
         <select
           value={selectedStaffId}
