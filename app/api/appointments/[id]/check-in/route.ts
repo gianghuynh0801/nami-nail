@@ -66,6 +66,7 @@ export async function POST(
       where: {
         salonId: appointment.salonId,
         checkedInAt: {
+          not: null,
           gte: todayStart,
           lte: todayEnd,
         },
