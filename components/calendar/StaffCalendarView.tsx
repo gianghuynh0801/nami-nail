@@ -1,0 +1,482 @@
+'use client'
+
+import { useState, useRef, useCallback } from 'react'
+import { format, addDays, subDays } from 'date-fns'
+import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react'
+import CalendarHeader from './CalendarHeader'
+import TimeColumn from './TimeColumn'
+import StaffColumn from './StaffColumn'
+import StaffColumnHeader from './StaffColumnHeader'
+import WaitingListSidebar from './WaitingListSidebar'
+import QueueList from './QueueList'
+import NotificationCenter from './NotificationCenter'
+import CurrentTimeLine from './CurrentTimeLine'
+import AppointmentDetailModal from './AppointmentDetailModal'
+import MiniCalendar from './MiniCalendar'
+import { useCalendarData } from './hooks/useCalendarData'
+import { useCalendarDragDrop } from './hooks/useCalendarDragDrop'
+import { useAutoScroll } from './hooks/useAutoScroll'
+import { CALENDAR_CONFIG } from './constants'
+import type { CalendarAppointment, WaitingAppointment } from './types'
+
+interface StaffCalendarViewProps {
+  salonId: string
+  onAddAppointment?: () => void
+  onAppointmentClick?: (appointment: CalendarAppointment) => void
+  onTimeSlotClick?: (staffId: string, time: string, date: Date) => void
+}
+
+export default function StaffCalendarView({ 
+  salonId,
+  onAddAppointment,
+  onAppointmentClick,
+  onTimeSlotClick,
+}: StaffCalendarViewProps) {
+  const [selectedDate, setSelectedDate] = useState(new Date())
+  const [showWaitingList, setShowWaitingList] = useState(true)
+  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false)
+  const [selectedAppointment, setSelectedAppointment] = useState<CalendarAppointment | null>(null)
+  const [selectedStaffName, setSelectedStaffName] = useState('')
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const staffScrollRef = useRef<HTMLDivElement>(null)
+  const headerScrollRef = useRef<HTMLDivElement>(null)
+
+  const { 
+    staff, 
+    waitingList, 
+    isLoading,
+    error,
+    refetch,
+    moveAppointment,
+    assignFromWaitingList,
+  } = useCalendarData(salonId, selectedDate)
+
+  const {
+    dragState,
+    handleDragStart,
+    handleDragMove,
+    handleDragEnd,
+    handleDrop,
+    cancelDrag,
+  } = useCalendarDragDrop({
+    onMoveAppointment: async (appointmentId, newStaffId, newStartTime) => {
+      await moveAppointment(appointmentId, newStaffId, newStartTime)
+    },
+  })
+
+  // Auto-scroll to current time on mount
+  useAutoScroll(scrollContainerRef, selectedDate)
+
+  // Get checked-in appointments from all staff
+  const checkedInAppointments = staff.flatMap(s => 
+    s.appointments.filter(apt => apt.status === 'CHECKED_IN')
+  )
+
+  const handleDateChange = (date: Date) => {
+    setSelectedDate(date)
+  }
+
+  const handlePrevDay = () => setSelectedDate(prev => subDays(prev, 1))
+  const handleNextDay = () => setSelectedDate(prev => addDays(prev, 1))
+  const handleToday = () => setSelectedDate(new Date())
+
+  const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
+
+  // Sync horizontal scroll between header and body
+  const handleBodyScroll = useCallback(() => {
+    if (staffScrollRef.current && headerScrollRef.current) {
+      headerScrollRef.current.scrollLeft = staffScrollRef.current.scrollLeft
+    }
+  }, [])
+
+  const handleHeaderScroll = useCallback(() => {
+    if (staffScrollRef.current && headerScrollRef.current) {
+      staffScrollRef.current.scrollLeft = headerScrollRef.current.scrollLeft
+    }
+  }, [])
+
+  // Handle assign from waiting list
+  const handleAssignFromWaitingList = useCallback((
+    appointment: WaitingAppointment, 
+    staffId: string, 
+    time: string
+  ) => {
+    assignFromWaitingList(appointment.id, staffId, time)
+  }, [assignFromWaitingList])
+
+  // Handle appointment click - show detail modal
+  const handleAppointmentClick = useCallback((appointment: CalendarAppointment) => {
+    const staffMember = staff.find(s => s.id === appointment.staffId)
+    setSelectedStaffName(staffMember?.name || '')
+    setSelectedAppointment(appointment)
+    
+    // Also call external handler if provided
+    if (onAppointmentClick) {
+      onAppointmentClick(appointment)
+    }
+  }, [staff, onAppointmentClick])
+
+  // Handle appointment actions
+  const handleCheckIn = useCallback(async (appointmentId: string, staffId?: string) => {
+    try {
+      const res = await fetch(`/api/appointments/${appointmentId}/check-in`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ staffId }),
+      })
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || 'Failed to check-in appointment')
+      }
+      // Refresh data after check-in
+      refetch()
+    } catch (error: any) {
+      console.error('Error checking in appointment:', error)
+      throw error
+    }
+  }, [refetch])
+
+  const handleStartAppointment = useCallback(async (appointmentId: string) => {
+    try {
+      const res = await fetch('/api/shift/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appointmentId, salonId }),
+      })
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || 'Failed to start appointment')
+      }
+      // Refresh data after starting
+      refetch()
+    } catch (error: any) {
+      console.error('Error starting appointment:', error)
+      throw error
+    }
+  }, [salonId, refetch])
+
+  const handleCompleteAppointment = useCallback(async (appointmentId: string) => {
+    try {
+      const res = await fetch('/api/shift/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          appointmentId,
+          salonId,
+        }),
+      })
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to complete appointment')
+      }
+      // Refresh data after completing
+      refetch()
+    } catch (error) {
+      console.error('Error completing appointment:', error)
+      throw error
+    }
+  }, [salonId, refetch])
+
+  const handleCancelAppointment = useCallback(async (appointmentId: string) => {
+    try {
+      const res = await fetch(`/api/appointments/${appointmentId}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) throw new Error('Failed to cancel appointment')
+      // Refresh data after canceling
+      refetch()
+    } catch (error) {
+      console.error('Error canceling appointment:', error)
+      throw error
+    }
+  }, [refetch])
+
+  // Handle drop from waiting list drag
+  const handleWaitingListDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    const appointmentId = e.dataTransfer.getData('appointmentId')
+    if (appointmentId && dragState.dropTarget) {
+      assignFromWaitingList(appointmentId, dragState.dropTarget.staffId, dragState.dropTarget.time)
+    }
+  }, [assignFromWaitingList, dragState.dropTarget])
+
+  if (isLoading) {
+    return (
+      <div className="h-[calc(100vh-8rem)] flex items-center justify-center bg-beige-light">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-400 mx-auto" />
+          <p className="mt-4 text-gray-600">Đang tải lịch...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="h-[calc(100vh-8rem)] flex items-center justify-center bg-beige-light">
+        <div className="text-center">
+          <p className="text-red-500 mb-2">❌ {error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary-400 text-white rounded-lg hover:bg-primary-500"
+          >
+            Thử lại
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (staff.length === 0) {
+    return (
+      <div className="h-[calc(100vh-8rem)] flex flex-col bg-beige-light">
+        <CalendarHeader
+          selectedDate={selectedDate}
+          onDateChange={handleDateChange}
+          onPrevDay={handlePrevDay}
+          onNextDay={handleNextDay}
+          onToday={handleToday}
+          showWaitingList={showWaitingList}
+          onToggleWaitingList={() => setShowWaitingList(!showWaitingList)}
+          waitingCount={waitingList.length}
+          onAddAppointment={onAddAppointment}
+        />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-gray-500 mb-2">Chưa có nhân viên nào</p>
+            <p className="text-sm text-gray-400">Vui lòng thêm nhân viên vào salon</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="h-[calc(100vh-8rem)] flex flex-col bg-beige-light relative">
+      {/* Header */}
+      <CalendarHeader
+        selectedDate={selectedDate}
+        onDateChange={handleDateChange}
+        onPrevDay={handlePrevDay}
+        onNextDay={handleNextDay}
+        onToday={handleToday}
+        showWaitingList={showWaitingList}
+        onToggleWaitingList={() => setShowWaitingList(!showWaitingList)}
+        waitingCount={waitingList.length}
+        onAddAppointment={onAddAppointment}
+      />
+
+      {/* Notification Center */}
+      <NotificationCenter appointments={checkedInAppointments} />
+
+      {/* Main Content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Sidebar - Mini Calendar */}
+        <div className="hidden lg:flex flex-shrink-0 bg-white border-r border-beige-dark relative transition-all duration-300">
+          {/* Collapsed state - thin bar with toggle button */}
+          {isLeftSidebarCollapsed ? (
+            <div className="w-12 flex flex-col items-center py-4 border-r border-beige-dark">
+              <button
+                onClick={() => setIsLeftSidebarCollapsed(false)}
+                className="p-2 hover:bg-beige-light rounded-lg transition-colors"
+                title="Mở sidebar"
+              >
+                <ChevronRight className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Expanded state - full sidebar */}
+              <div className="w-64 flex-shrink-0 overflow-y-auto relative">
+                {/* Toggle button - positioned at top right */}
+                <button
+                  onClick={() => setIsLeftSidebarCollapsed(true)}
+                  className="absolute top-2 right-2 z-10 p-1.5 hover:bg-beige-light rounded-lg transition-colors bg-white shadow-sm border border-beige-dark"
+                  title="Thu nhỏ sidebar"
+                >
+                  <ChevronLeft className="w-4 h-4 text-gray-600" />
+                </button>
+
+                <div className="p-4">
+                  <div className="space-y-4">
+                    {/* Mini Calendar */}
+                    <MiniCalendar 
+                      selectedDate={selectedDate}
+                      onDateChange={handleDateChange}
+                    />
+                    
+                    {/* Additional content can be added here */}
+                    {/* For example: Product/Voucher section, Support links, etc. */}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Calendar Area */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Staff Headers (sticky) */}
+          <div className="flex border-b border-beige-dark bg-white sticky top-0 z-20 flex-shrink-0">
+            {/* Time column header spacer */}
+            <div className="w-16 md:w-20 flex-shrink-0 border-r border-beige-dark bg-beige-light" />
+            
+            {/* Staff column headers - horizontal scroll */}
+            <div 
+              ref={headerScrollRef}
+              className="flex-1 overflow-x-auto scrollbar-hide"
+              onScroll={handleHeaderScroll}
+            >
+              <div className="flex" style={{ width: 'fit-content' }}>
+                {staff.map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex-shrink-0 border-r border-beige-dark"
+                    style={{ width: CALENDAR_CONFIG.COLUMN_MIN_WIDTH }}
+                  >
+                    <StaffColumnHeader staff={s} />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Spacer for scrollbar alignment if sidebar is shown */}
+            {showWaitingList && <div className="w-0 lg:w-72 flex-shrink-0" />}
+          </div>
+
+          {/* Scrollable Calendar Body */}
+          <div className="flex-1 flex overflow-hidden">
+            <div
+              ref={scrollContainerRef}
+              className="flex-1 overflow-y-auto relative"
+              onMouseMove={dragState.isDragging ? handleDragMove : undefined}
+              onMouseUp={dragState.isDragging ? handleDragEnd : undefined}
+              onMouseLeave={dragState.isDragging ? cancelDrag : undefined}
+              onDrop={handleWaitingListDrop}
+              onDragOver={(e) => e.preventDefault()}
+            >
+              <div className="flex min-h-full">
+                {/* Time Column */}
+                <TimeColumn />
+
+                {/* Staff Columns Container */}
+                <div 
+                  ref={staffScrollRef}
+                  className="flex-1 overflow-x-auto scrollbar-hide"
+                  onScroll={handleBodyScroll}
+                >
+                  <div className="flex relative" style={{ width: 'fit-content' }}>
+                    {staff.map((s) => (
+                      <StaffColumn
+                        key={s.id}
+                        staff={s}
+                        selectedDate={selectedDate}
+                        dragState={dragState}
+                        onDragStart={handleDragStart}
+                        onDrop={handleDrop}
+                        onAppointmentClick={handleAppointmentClick}
+                        onTimeSlotClick={onTimeSlotClick}
+                      />
+                    ))}
+
+                    {/* Current Time Line */}
+                    {isToday && (
+                      <CurrentTimeLine staffCount={staff.length} />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Queue List Sidebar (desktop) - for checked-in customers */}
+            {checkedInAppointments.length > 0 && (
+              <div className="hidden lg:block flex-shrink-0">
+                <QueueList
+                  appointments={checkedInAppointments}
+                  onStart={handleStartAppointment}
+                />
+              </div>
+            )}
+
+            {/* Waiting List Sidebar (desktop) - for pending appointments */}
+            {showWaitingList && waitingList.length > 0 && (
+              <div className="hidden lg:block flex-shrink-0">
+                <WaitingListSidebar
+                  appointments={waitingList}
+                  staff={staff}
+                  onAssign={handleAssignFromWaitingList}
+                  onClose={() => setShowWaitingList(false)}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Drag Overlay */}
+      {dragState.isDragging && dragState.draggedAppointment && (
+        <div
+          className="fixed pointer-events-none z-50"
+          style={{
+            left: dragState.dragPosition.x - 80,
+            top: dragState.dragPosition.y - 20,
+            width: CALENDAR_CONFIG.COLUMN_MIN_WIDTH - 16,
+          }}
+        >
+          <div className="bg-primary-400 text-white rounded-lg p-2 shadow-xl opacity-90 border-2 border-primary-500">
+            <p className="text-sm font-medium truncate">
+              {dragState.draggedAppointment.customerName}
+            </p>
+            <p className="text-xs opacity-90">
+              {dragState.draggedAppointment.service.name}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile: Bottom Waiting List Button */}
+      <div className="lg:hidden fixed bottom-4 right-4 z-30">
+        <button
+          onClick={() => setShowWaitingList(!showWaitingList)}
+          className="bg-primary-400 text-white px-4 py-3 rounded-full shadow-lg flex items-center gap-2 hover:bg-primary-500 transition-colors"
+        >
+          <span>📋</span>
+          <span className="font-medium">Chờ ({waitingList.length})</span>
+        </button>
+      </div>
+
+      {/* Mobile: Waiting List Bottom Sheet */}
+      {showWaitingList && (
+        <div className="lg:hidden fixed inset-0 z-40">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowWaitingList(false)}
+          />
+          
+          {/* Bottom Sheet */}
+          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl max-h-[70vh] flex flex-col animate-slide-up">
+            <WaitingListSidebar
+              appointments={waitingList}
+              staff={staff}
+              onAssign={handleAssignFromWaitingList}
+              onClose={() => setShowWaitingList(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Appointment Detail Modal */}
+      <AppointmentDetailModal
+        appointment={selectedAppointment}
+        staffName={selectedStaffName}
+        isOpen={!!selectedAppointment}
+        onClose={() => setSelectedAppointment(null)}
+        onCheckIn={handleCheckIn}
+        onStart={handleStartAppointment}
+        onComplete={handleCompleteAppointment}
+        onCancel={handleCancelAppointment}
+      />
+    </div>
+  )
+}

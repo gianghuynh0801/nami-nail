@@ -1,0 +1,307 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  STAFF
+  CUSTOMER
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  IN_PROGRESS
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CARD
+  OTHER
+}
+
+enum InvoiceStatus {
+  DRAFT
+  PENDING
+  PAID
+  CANCELLED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?  @unique
+  password  String?
+  phone     String?  @unique
+  role      Role
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownedSalons Salon[]   @relation("SalonOwner")
+  customer    Customer?
+
+  @@map("users")
+}
+
+model Salon {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  address   String
+  phone     String
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner           User                @relation("SalonOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  services        Service[]
+  staff           Staff[]
+  appointments    Appointment[]
+  invoices        Invoice[]
+  workingHours    SalonWorkingHours[]
+  staffPriorities StaffPriority[]
+  serviceCategories ServiceCategory[]
+
+  @@map("salons")
+}
+
+model Service {
+  id        String   @id @default(cuid())
+  name      String
+  price     Float
+  duration  Int // duration in minutes (default/fallback)
+  salonId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  salon         Salon                   @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  appointments  Appointment[]
+  staffServices StaffService[]
+  invoiceItems  InvoiceItem[]
+  categories    ServiceCategoryService[]
+
+  @@map("services")
+}
+
+model Staff {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String
+  salonId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  salon         Salon           @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  appointments  Appointment[]
+  schedules     StaffSchedule[]
+  staffServices StaffService[]
+  priority      StaffPriority?
+
+  @@map("staff")
+}
+
+model Customer {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  name        String
+  phone       String    @unique
+  email       String?
+  dateOfBirth DateTime?
+  address     String?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+  invoices     Invoice[]
+
+  @@map("customers")
+}
+
+model SalonWorkingHours {
+  id        String   @id @default(cuid())
+  salonId   String
+  dayOfWeek Int // 0 = Chủ nhật, 1 = Thứ 2, ..., 6 = Thứ 7
+  startTime String // "09:00"
+  endTime   String // "18:00"
+  isOpen    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  salon Salon @relation(fields: [salonId], references: [id], onDelete: Cascade)
+
+  @@unique([salonId, dayOfWeek])
+  @@map("salon_working_hours")
+}
+
+model Appointment {
+  id            String            @id @default(cuid())
+  customerId    String?
+  customerName  String
+  customerPhone String
+  serviceId     String
+  staffId       String
+  startTime     DateTime
+  endTime       DateTime
+  status        AppointmentStatus @default(PENDING)
+  salonId       String
+  notes         String? // Ghi chú cho lịch hẹn
+  checkedInAt   DateTime? // Thời gian khách check-in
+  startedAt     DateTime? // Thời gian bắt đầu thực tế
+  completedAt   DateTime? // Thời gian hoàn thành thực tế
+  queueNumber   Int? // Số thứ tự trong ngày (reset mỗi ngày)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  salon    Salon     @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  service  Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  staff    Staff     @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  invoice  Invoice?
+
+  @@map("appointments")
+}
+
+model Invoice {
+  id            String         @id @default(cuid())
+  customerId    String?
+  salonId       String
+  appointmentId String?        @unique
+  totalAmount   Float
+  discount      Float          @default(0)
+  finalAmount   Float
+  paymentMethod PaymentMethod?
+  status        InvoiceStatus  @default(DRAFT)
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  salon       Salon         @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  customer    Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  appointment Appointment?  @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  items       InvoiceItem[]
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id         String   @id @default(cuid())
+  invoiceId  String
+  serviceId  String
+  quantity   Int      @default(1)
+  unitPrice  Float
+  totalPrice Float
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_items")
+}
+
+model StaffSchedule {
+  id         String    @id @default(cuid())
+  staffId    String
+  staff      Staff     @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  dayOfWeek  Int // 0 = Chủ nhật, 1 = Thứ 2, ..., 6 = Thứ 7
+  startTime  String // "09:00"
+  endTime    String // "18:00"
+  breakStart String? // "12:00" (optional)
+  breakEnd   String? // "13:00" (optional)
+  date       DateTime? // Nếu ca đặc biệt chỉ 1 ngày
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([staffId, dayOfWeek, date])
+  @@map("staff_schedules")
+}
+
+model StaffService {
+  id        String   @id @default(cuid())
+  staffId   String
+  serviceId String
+  duration  Int // Thời gian làm việc của thợ này cho dịch vụ này (phút)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  staff   Staff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([staffId, serviceId]) // Mỗi thợ chỉ có 1 duration cho mỗi dịch vụ
+  @@map("staff_services")
+}
+
+model StaffPriority {
+  id                String    @id @default(cuid())
+  staffId           String    @unique
+  salonId           String
+  priorityOrder     Int // Thứ tự ưu tiên (số nhỏ = ưu tiên cao)
+  sortByRevenue     String    @default("DESC") // ASC hoặc DESC
+  isActive          Boolean   @default(true) // Có đang trong ca không
+  currentShiftStart DateTime? // Thời gian bắt đầu ca hiện tại
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  staff   Staff          @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  salon   Salon          @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  history ShiftHistory[]
+
+  @@map("staff_priorities")
+}
+
+model ShiftHistory {
+  id              String   @id @default(cuid())
+  staffPriorityId String
+  priorityOrder   Int // Thứ tự ưu tiên tại thời điểm này
+  sortByRevenue   String // ASC hoặc DESC tại thời điểm này
+  changedBy       String // User ID của người thay đổi
+  reason          String? // Lý do thay đổi
+  createdAt       DateTime @default(now())
+
+  staffPriority StaffPriority @relation(fields: [staffPriorityId], references: [id], onDelete: Cascade)
+
+  @@map("shift_history")
+}
+
+model ServiceCategory {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  salonId     String
+  order       Int      @default(0) // Thứ tự hiển thị
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  salon     Salon                   @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  services  ServiceCategoryService[]
+
+  @@map("service_categories")
+}
+
+model ServiceCategoryService {
+  id         String   @id @default(cuid())
+  categoryId String
+  serviceId String
+  createdAt  DateTime @default(now())
+
+  category ServiceCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  service  Service         @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, serviceId])
+  @@map("service_category_services")
+}

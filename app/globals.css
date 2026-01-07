@@ -1,0 +1,513 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* React Big Calendar CSS */
+@import 'react-big-calendar/lib/css/react-big-calendar.css';
+
+:root {
+  --foreground-rgb: 44, 44, 44;
+  --background-start-rgb: 255, 255, 255;
+  --background-end-rgb: 250, 249, 247;
+  --color-primary: #bca37f;
+  --color-beige-light: #faf9f7;
+  --color-beige: #f5f1eb;
+  --color-beige-dark: #e8ddd0;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+  min-height: 100vh;
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* Glassmorphism effect */
+  .glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(188, 163, 127, 0.1);
+  }
+  
+  /* Modern card with beige accent */
+  .card-modern {
+    background: white;
+    box-shadow: 0 2px 15px -3px rgba(188, 163, 127, 0.1), 0 10px 20px -2px rgba(188, 163, 127, 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid rgba(188, 163, 127, 0.05);
+  }
+  
+  .card-modern:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 25px -5px rgba(188, 163, 127, 0.15), 0 20px 40px -5px rgba(188, 163, 127, 0.08);
+    border-color: rgba(188, 163, 127, 0.2);
+  }
+  
+  /* Gradient text with beige/gold */
+  .gradient-text {
+    background: linear-gradient(135deg, #bca37f 0%, #9d8565 50%, #7d6a4f 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Elegant button style */
+  .btn-elegant {
+    background: linear-gradient(135deg, #bca37f 0%, #9d8565 100%);
+    color: white;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(188, 163, 127, 0.3);
+  }
+
+  .btn-elegant:hover {
+    background: linear-gradient(135deg, #9d8565 0%, #7d6a4f 100%);
+    box-shadow: 0 6px 20px rgba(188, 163, 127, 0.4);
+    transform: translateY(-2px);
+  }
+}
+
+/* React Big Calendar Styles with beige theme */
+.rbc-calendar {
+  min-height: 600px;
+  font-family: var(--font-inter), sans-serif;
+}
+
+.rbc-header {
+  padding: 10px 3px;
+  font-weight: 600;
+  border-bottom: 2px solid #e8ddd0;
+  color: #5d4f3a;
+}
+
+.rbc-today {
+  background-color: #faf9f7;
+}
+
+.rbc-off-range-bg {
+  background-color: #faf9f7;
+}
+
+.rbc-event {
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 12px;
+  background-color: #bca37f;
+  border-color: #9d8565;
+  cursor: move;
+  user-select: none;
+}
+
+.rbc-event.rbc-selected {
+  background-color: #9d8565;
+  border: 2px solid #7d6a4f;
+}
+
+.rbc-event:active,
+.rbc-event.rbc-addons-dnd-dragging {
+  opacity: 0.7;
+  cursor: grabbing;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transform: scale(1.05);
+}
+
+/* Mobile touch improvements */
+@media (max-width: 768px) {
+  .rbc-event {
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  .rbc-event:active {
+    cursor: grabbing;
+  }
+  
+  .rbc-addons-dnd-drag-preview {
+    opacity: 0.8;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+  }
+}
+
+.rbc-event-content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rbc-toolbar {
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.rbc-toolbar button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #e8ddd0;
+  border-radius: 0.5rem;
+  background: white;
+  color: #5d4f3a;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--font-inter), sans-serif;
+}
+
+.rbc-toolbar button:hover {
+  background: #f5f1eb;
+  border-color: #bca37f;
+  color: #3d3426;
+}
+
+.rbc-toolbar button.rbc-active {
+  background: #bca37f;
+  color: white;
+  border-color: #bca37f;
+}
+
+.rbc-btn-group {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.rbc-month-view {
+  border: 1px solid #e8ddd0;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.rbc-month-row {
+  border-bottom: 1px solid #e8ddd0;
+}
+
+.rbc-day-bg {
+  border-right: 1px solid #e8ddd0;
+}
+
+.rbc-day-bg:last-child {
+  border-right: none;
+}
+
+.rbc-date-cell {
+  padding: 0.5rem;
+  text-align: right;
+}
+
+.rbc-date-cell.rbc-now {
+  font-weight: 700;
+  color: #bca37f;
+}
+
+/* ============================================
+   Staff Calendar View Styles
+   ============================================ */
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Striped pattern for break time */
+.bg-stripes {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 8px,
+    rgba(188, 163, 127, 0.15) 8px,
+    rgba(188, 163, 127, 0.15) 16px
+  );
+}
+
+/* Touch feedback for mobile drag */
+@media (hover: none) {
+  .appointment-draggable:active {
+    transform: scale(1.05);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+  }
+}
+
+/* Smooth scroll for calendar */
+.calendar-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Snap points for mobile staff columns */
+@media (max-width: 768px) {
+  .staff-columns-container {
+    scroll-snap-type: x mandatory;
+  }
+  
+  .staff-column {
+    scroll-snap-align: start;
+  }
+}
+
+/* Drop zone animation */
+@keyframes dropZonePulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.drop-zone-active {
+  animation: dropZonePulse 0.5s ease-in-out infinite;
+}
+
+/* Calendar grid lines */
+.calendar-hour-line {
+  position: relative;
+}
+
+.calendar-hour-line::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(to right, #e8ddd0, transparent);
+}
+
+/* Current time indicator animation */
+@keyframes timelinePulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0);
+  }
+}
+
+.current-time-dot {
+  animation: timelinePulse 2s ease-in-out infinite;
+}
+
+/* Appointment block hover effect */
+.appointment-block {
+  transition: all 0.15s ease-out;
+}
+
+.appointment-block:hover {
+  z-index: 10;
+}
+
+/* Mobile bottom sheet slide up animation */
+@keyframes slideUpFromBottom {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slideUpFromBottom 0.3s ease-out forwards;
+}
+
+/* Modal scale-in animation */
+@keyframes scaleIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out forwards;
+}
+
+/* Waiting list item drag states */
+.waiting-item-dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+}
+
+/* Staff column header sticky behavior */
+.staff-header-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: white;
+}
+
+/* Calendar responsive adjustments */
+@media (max-width: 640px) {
+  .calendar-time-column {
+    width: 48px;
+    font-size: 10px;
+  }
+  
+  .calendar-staff-column {
+    min-width: 240px;
+  }
+}
+
+/* High contrast focus states for accessibility */
+.calendar-focusable:focus-visible {
+  outline: 2px solid #bca37f;
+  outline-offset: 2px;
+}
+
+/* Print styles for calendar */
+@media print {
+  .calendar-no-print {
+    display: none !important;
+  }
+  
+  .calendar-container {
+    height: auto !important;
+    overflow: visible !important;
+  }
+}
+
+/* ============================================
+   Booking Wizard Modal Styles
+   ============================================ */
+
+/* Single bounce animation for success icon */
+@keyframes bounceOnce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-bounce-once {
+  animation: bounceOnce 0.6s ease-out;
+}
+
+/* Wizard step transitions */
+.wizard-step-enter {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.wizard-step-enter-active {
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 300ms ease-out, transform 300ms ease-out;
+}
+
+.wizard-step-exit {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.wizard-step-exit-active {
+  opacity: 0;
+  transform: translateX(-20px);
+  transition: opacity 200ms ease-in, transform 200ms ease-in;
+}
+
+/* Selection card pulse effect */
+@keyframes selectPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(188, 163, 127, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(188, 163, 127, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(188, 163, 127, 0);
+  }
+}
+
+.selection-pulse {
+  animation: selectPulse 0.5s ease-out;
+}
+
+/* Calendar date hover */
+.calendar-date-hover:hover:not(:disabled) {
+  transform: scale(1.1);
+}
+
+/* Time slot button */
+.time-slot-btn {
+  transition: all 0.15s ease-out;
+}
+
+.time-slot-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+
+/* Progress step animation */
+@keyframes stepComplete {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.step-complete-animation {
+  animation: stepComplete 0.3s ease-out;
+}
+
+/* Smooth modal backdrop */
+.modal-backdrop {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* Form input focus glow */
+.input-focus-glow:focus {
+  box-shadow: 0 0 0 3px rgba(188, 163, 127, 0.2);
+}
+
+/* Success checkmark animation */
+@keyframes checkmark {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.checkmark-animate {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: checkmark 0.5s ease-out 0.2s forwards;
+}
