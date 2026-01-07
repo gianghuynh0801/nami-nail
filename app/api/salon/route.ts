@@ -25,6 +25,15 @@ export async function GET(request: Request) {
     const salons = await prisma.salon.findMany({
       where: { ownerId: session.user.id },
       orderBy: { createdAt: 'desc' },
+      include: {
+        _count: {
+          select: {
+            appointments: true,
+            services: true,
+            staff: true,
+          },
+        },
+      },
     })
 
     return NextResponse.json({ salons })

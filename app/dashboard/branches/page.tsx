@@ -169,15 +169,15 @@ export default function BranchesPage() {
 
                   <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-200">
                     <div className="text-center">
-                      <div className="text-lg font-semibold text-gray-900">{salon._count.appointments}</div>
+                      <div className="text-lg font-semibold text-gray-900">{salon._count?.appointments || 0}</div>
                       <div className="text-xs text-gray-500">Lịch hẹn</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-lg font-semibold text-gray-900">{salon._count.services}</div>
+                      <div className="text-lg font-semibold text-gray-900">{salon._count?.services || 0}</div>
                       <div className="text-xs text-gray-500">Dịch vụ</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-lg font-semibold text-gray-900">{salon._count.staff}</div>
+                      <div className="text-lg font-semibold text-gray-900">{salon._count?.staff || 0}</div>
                       <div className="text-xs text-gray-500">Nhân viên</div>
                     </div>
                   </div>

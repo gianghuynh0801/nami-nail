@@ -17,6 +17,8 @@ interface AppointmentDetailModalProps {
   onComplete?: (appointmentId: string) => Promise<void>
   onCancel?: (appointmentId: string) => Promise<void>
   onEdit?: (appointment: CalendarAppointment) => void
+  onConfirm?: (appointmentId: string) => Promise<void>
+  isAdmin?: boolean
 }
 
 const STATUS_CONFIG = {
@@ -63,6 +65,8 @@ export default function AppointmentDetailModal({
   onComplete,
   onCancel,
   onEdit,
+  onConfirm,
+  isAdmin = false,
 }: AppointmentDetailModalProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [actionType, setActionType] = useState<string | null>(null)
@@ -103,7 +107,7 @@ export default function AppointmentDetailModal({
     return new Intl.NumberFormat('vi-VN').format(price) + 'đ'
   }
 
-  const handleAction = async (action: 'checkIn' | 'start' | 'complete' | 'cancel') => {
+  const handleAction = async (action: 'checkIn' | 'start' | 'complete' | 'cancel' | 'confirm') => {
     setIsLoading(true)
     setActionType(action)
     setError(null)
@@ -116,12 +120,14 @@ export default function AppointmentDetailModal({
         await onComplete(appointment.id)
       } else if (action === 'cancel' && onCancel) {
         await onCancel(appointment.id)
+      } else if (action === 'confirm' && onConfirm) {
+        await onConfirm(appointment.id)
       }
       // Only close modal on success
       onClose()
     } catch (error: any) {
       console.error(`Error ${action} appointment:`, error)
-      setError(error?.message || `Có lỗi xảy ra khi ${action === 'checkIn' ? 'check-in' : action === 'start' ? 'bắt đầu' : action === 'complete' ? 'hoàn thành' : 'hủy'} lịch hẹn`)
+      setError(error?.message || `Có lỗi xảy ra khi ${action === 'checkIn' ? 'check-in' : action === 'start' ? 'bắt đầu' : action === 'complete' ? 'hoàn thành' : action === 'confirm' ? 'xác nhận' : 'hủy'} lịch hẹn`)
     } finally {
       setIsLoading(false)
       setActionType(null)
@@ -301,6 +307,24 @@ export default function AppointmentDetailModal({
           )}
           
           {/* Status-based actions */}
+          {/* Admin can confirm PENDING appointments */}
+          {appointment.status === 'PENDING' && isAdmin && onConfirm && (
+            <div className="flex gap-2 mb-3">
+              <button
+                onClick={() => handleAction('confirm')}
+                disabled={isLoading}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors disabled:opacity-50 font-medium"
+              >
+                {isLoading && actionType === 'confirm' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <CheckCircle className="w-4 h-4" />
+                )}
+                Xác nhận
+              </button>
+            </div>
+          )}
+
           {appointment.status === 'CONFIRMED' && onCheckIn && (
             <div className="flex gap-2 mb-3">
               <button

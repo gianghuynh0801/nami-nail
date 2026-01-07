@@ -24,6 +24,7 @@ interface StaffCalendarViewProps {
   onAddAppointment?: () => void
   onAppointmentClick?: (appointment: CalendarAppointment) => void
   onTimeSlotClick?: (staffId: string, time: string, date: Date) => void
+  isAdmin?: boolean
 }
 
 export default function StaffCalendarView({ 
@@ -31,6 +32,7 @@ export default function StaffCalendarView({
   onAddAppointment,
   onAppointmentClick,
   onTimeSlotClick,
+  isAdmin = false,
 }: StaffCalendarViewProps) {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [showWaitingList, setShowWaitingList] = useState(true)
@@ -187,6 +189,25 @@ export default function StaffCalendarView({
       refetch()
     } catch (error) {
       console.error('Error canceling appointment:', error)
+      throw error
+    }
+  }, [refetch])
+
+  const handleConfirmAppointment = useCallback(async (appointmentId: string) => {
+    try {
+      const res = await fetch(`/api/appointments/${appointmentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'CONFIRMED' }),
+      })
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || 'Failed to confirm appointment')
+      }
+      // Refresh data after confirming
+      refetch()
+    } catch (error: any) {
+      console.error('Error confirming appointment:', error)
       throw error
     }
   }, [refetch])
@@ -476,6 +497,8 @@ export default function StaffCalendarView({
         onStart={handleStartAppointment}
         onComplete={handleCompleteAppointment}
         onCancel={handleCancelAppointment}
+        onConfirm={handleConfirmAppointment}
+        isAdmin={isAdmin}
       />
     </div>
   )

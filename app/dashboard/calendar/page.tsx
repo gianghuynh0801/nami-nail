@@ -1,16 +1,20 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 import StaffCalendarView from '@/components/calendar/StaffCalendarView'
 import { BookingWizardModal } from '@/components/booking-wizard'
 
 export default function CalendarPage() {
+  const { data: session } = useSession()
   const [salonId, setSalonId] = useState<string>('')
   const [salons, setSalons] = useState<{ id: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [showBookingWizard, setShowBookingWizard] = useState(false)
   const [initialStaffId, setInitialStaffId] = useState<string | undefined>()
   const [initialDateTime, setInitialDateTime] = useState<{ date: string; time: string } | undefined>()
+  
+  const isAdmin = session?.user?.role === 'OWNER'
 
   useEffect(() => {
     const fetchSalons = async () => {
@@ -82,6 +86,7 @@ export default function CalendarPage() {
       {salonId && (
         <StaffCalendarView 
           salonId={salonId}
+          isAdmin={isAdmin}
           onAddAppointment={() => {
             setInitialStaffId(undefined)
             setInitialDateTime(undefined)
