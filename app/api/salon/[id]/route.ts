@@ -16,14 +16,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+    // Allow public access for booking
+    // const session = await getServerSession(authOptions)
 
     const salon = await prisma.salon.findUnique({
       where: { id: params.id },
@@ -42,13 +36,6 @@ export async function GET(
       return NextResponse.json(
         { error: 'Salon not found' },
         { status: 404 }
-      )
-    }
-
-    if (session.user.role !== 'OWNER' || salon.ownerId !== session.user.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
       )
     }
 

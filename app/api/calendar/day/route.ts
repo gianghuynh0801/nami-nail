@@ -52,7 +52,7 @@ export async function GET(request: Request) {
         appointments: {
           where: {
             startTime: { gte: dayStart, lte: dayEnd },
-            status: { in: ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS'] },
+            status: { in: ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED'] },
           },
           include: {
             service: true,

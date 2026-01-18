@@ -67,6 +67,21 @@ export async function POST(request: Request) {
       },
     })
 
+    // Create Invoice for the completed appointment
+    if (updated.service) {
+      await prisma.invoice.create({
+        data: {
+          salonId: data.salonId,
+          appointmentId: data.appointmentId,
+          customerId: updated.customerId,
+          totalAmount: updated.service.price,
+          finalAmount: updated.service.price,
+          status: 'PAID',
+          paymentMethod: 'CASH', // Default to CASH for auto-generated
+        },
+      })
+    }
+
     return NextResponse.json({ appointment: updated })
   } catch (error: any) {
     if (error instanceof z.ZodError) {

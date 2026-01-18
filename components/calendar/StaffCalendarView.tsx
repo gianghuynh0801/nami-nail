@@ -489,6 +489,8 @@ export default function StaffCalendarView({
 
       {/* Appointment Detail Modal */}
       <AppointmentDetailModal
+        salonId={salonId}
+        staffList={staff}
         appointment={selectedAppointment}
         staffName={selectedStaffName}
         isOpen={!!selectedAppointment}

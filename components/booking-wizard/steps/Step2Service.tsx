@@ -1,21 +1,21 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Scissors, Clock, DollarSign, ChevronRight, ChevronLeft, Search, Check } from 'lucide-react'
+import { Scissors, Clock, DollarSign, ChevronRight, ChevronLeft, Search, Check, CheckSquare, Square } from 'lucide-react'
 import type { Service, ServiceCategory } from '../types'
 
 interface Step2ServiceProps {
   salonId: string
-  selectedServiceId: string | null
-  onSelect: (service: Service) => void
+  selectedServiceIds: string[]
+  onToggle: (service: Service) => void
   onNext: () => void
   onBack: () => void
 }
 
 export default function Step2Service({ 
   salonId, 
-  selectedServiceId, 
-  onSelect, 
+  selectedServiceIds = [],
+  onToggle, 
   onNext, 
   onBack 
 }: Step2ServiceProps) {
@@ -75,31 +75,18 @@ export default function Step2Service({
     return new Intl.NumberFormat('vi-VN').format(price) + 'đ'
   }
 
-  const handleSelect = (service: Service) => {
-    onSelect(service)
+  const handleToggle = (service: Service) => {
+    onToggle(service)
   }
 
   const handleContinue = () => {
-    if (selectedServiceId) {
+    if (selectedServiceIds.length > 0) {
       onNext()
     }
   }
 
   const handleCategorySelect = (categoryId: string | null) => {
     setSelectedCategoryId(categoryId)
-    // Clear selected service when changing category
-    if (selectedServiceId) {
-      const service = services.find(s => s.id === selectedServiceId)
-      if (service) {
-        // Only clear if service doesn't belong to new category
-        if (categoryId !== null) {
-          const category = categories.find(c => c.id === categoryId)
-          if (category && !category.serviceIds.includes(selectedServiceId)) {
-            // Service doesn't belong to this category, keep it selected but user can see it's not in filtered list
-          }
-        }
-      }
-    }
   }
 
   if (loading) {
@@ -121,7 +108,7 @@ export default function Step2Service({
           Chọn Dịch vụ
         </h2>
         <p className="text-gray-500">
-          Chọn dịch vụ bạn muốn sử dụng
+          Chọn một hoặc nhiều dịch vụ bạn muốn sử dụng
         </p>
       </div>
 
@@ -205,55 +192,49 @@ export default function Step2Service({
               )}
             </div>
           ) : (
-            filteredServices.map((service) => (
-              <button
-                key={service.id}
-                onClick={() => handleSelect(service)}
-                className={`
-                  w-full text-left p-4 rounded-xl border-2 transition-all duration-200
-                  ${selectedServiceId === service.id
-                    ? 'border-primary-400 bg-primary-50 shadow-md'
-                    : 'border-gray-200 bg-white hover:border-primary-300 hover:shadow-sm'
-                  }
-                `}
-              >
-                <div className="flex items-start gap-4">
-                  {/* Icon */}
-                  <div className={`
-                    w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0
-                    ${selectedServiceId === service.id ? 'bg-primary-400 text-white' : 'bg-primary-100 text-primary-600'}
-                  `}>
-                    <Scissors className="w-6 h-6" />
-                  </div>
+            filteredServices.map((service) => {
+              const isSelected = selectedServiceIds.includes(service.id)
+              return (
+                <button
+                  key={service.id}
+                  onClick={() => handleToggle(service)}
+                  className={`
+                    w-full text-left p-4 rounded-xl border-2 transition-all duration-200
+                    ${isSelected
+                      ? 'border-primary-400 bg-primary-50 shadow-md'
+                      : 'border-gray-200 bg-white hover:border-primary-300 hover:shadow-sm'
+                    }
+                  `}
+                >
+                  <div className="flex items-start gap-4">
+                    {/* Checkbox Icon */}
+                    <div className={`
+                      flex-shrink-0 mt-1
+                      ${isSelected ? 'text-primary-500' : 'text-gray-300'}
+                    `}>
+                      {isSelected ? <CheckSquare className="w-6 h-6" /> : <Square className="w-6 h-6" />}
+                    </div>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 mb-2">
-                      {service.name}
-                    </h3>
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="flex items-center gap-1 text-gray-500">
-                        <Clock className="w-4 h-4" />
-                        {service.duration} phút
-                      </span>
-                      <span className="flex items-center gap-1 font-semibold text-primary-600">
-                        <DollarSign className="w-4 h-4" />
-                        {formatPrice(service.price)}
-                      </span>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 mb-2">
+                        {service.name}
+                      </h3>
+                      <div className="flex items-center gap-4 text-sm">
+                        <span className="flex items-center gap-1 text-gray-500">
+                          <Clock className="w-4 h-4" />
+                          {service.duration} phút
+                        </span>
+                        <span className="flex items-center gap-1 font-semibold text-primary-600">
+                          <DollarSign className="w-4 h-4" />
+                          {formatPrice(service.price)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-
-                  {/* Selected indicator */}
-                  {selectedServiceId === service.id && (
-                    <div className="w-6 h-6 rounded-full bg-primary-400 flex items-center justify-center flex-shrink-0">
-                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-              </button>
-            ))
+                </button>
+              )
+            })
           )}
         </div>
       </div>
@@ -269,16 +250,16 @@ export default function Step2Service({
         </button>
         <button
           onClick={handleContinue}
-          disabled={!selectedServiceId}
+          disabled={selectedServiceIds.length === 0}
           className={`
             flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium transition-all
-            ${selectedServiceId
+            ${selectedServiceIds.length > 0
               ? 'bg-primary-400 text-white hover:bg-primary-500 shadow-lg shadow-primary-400/30'
               : 'bg-gray-100 text-gray-400 cursor-not-allowed'
             }
           `}
         >
-          Tiếp tục
+          Tiếp tục ({selectedServiceIds.length})
           <ChevronRight className="w-5 h-5" />
         </button>
       </div>

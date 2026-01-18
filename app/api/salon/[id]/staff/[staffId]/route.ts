@@ -6,7 +6,6 @@ import { z } from 'zod'
 
 const updateStaffSchema = z.object({
   name: z.string().min(1).optional(),
-  phone: z.string().min(1).optional(),
 })
 
 export async function GET(

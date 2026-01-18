@@ -22,7 +22,7 @@ export default function Step6Review({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const { salon, service, staff, isAnyStaff, selectedDate, selectedTime, customerInfo } = state
+  const { salon, staff, isAnyStaff, selectedDate, selectedTime, customerInfo } = state
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('vi-VN').format(price) + 'đ'
@@ -105,14 +105,19 @@ export default function Step6Review({
           />
         )}
 
-        {service && (
-          <ReviewItem
-            icon={Scissors}
-            label="Dịch vụ"
-            value={service.name}
-            subValue={`${service.duration} phút • ${formatPrice(service.price)}`}
-            step={2}
-          />
+        {state.services.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {state.services.map((s, index) => (
+              <ReviewItem
+                key={s.id}
+                icon={Scissors}
+                label={`Dịch vụ ${index + 1}`}
+                value={s.name}
+                subValue={`${s.duration} phút • ${formatPrice(s.price)}`}
+                step={2}
+              />
+            ))}
+          </div>
         )}
 
         <ReviewItem
@@ -150,12 +155,14 @@ export default function Step6Review({
       </div>
 
       {/* Price Summary */}
-      {service && (
+      {state.services.length > 0 && (
         <div className="bg-gradient-to-r from-primary-400 to-primary-500 rounded-xl p-5 text-white">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-primary-100 text-sm">Tổng thanh toán</p>
-              <p className="text-3xl font-bold">{formatPrice(service.price)}</p>
+              <p className="text-3xl font-bold">
+                {formatPrice(state.services.reduce((total, s) => total + s.price, 0))}
+              </p>
             </div>
             <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center">
               <DollarSign className="w-7 h-7" />
@@ -164,7 +171,9 @@ export default function Step6Review({
           <div className="mt-3 pt-3 border-t border-white/20">
             <div className="flex items-center gap-2 text-sm text-primary-100">
               <Clock className="w-4 h-4" />
-              <span>Thời gian: {service.duration} phút</span>
+              <span>
+                Tổng thời gian: {state.services.reduce((total, s) => total + s.duration, 0)} phút
+              </span>
             </div>
           </div>
         </div>

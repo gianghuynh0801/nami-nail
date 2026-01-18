@@ -36,7 +36,7 @@ interface BookingFormProps {
 
 const bookingSchema = z.object({
   customerName: z.string().min(1, 'Full name is required'),
-  customerPhone: z.string().min(10, 'Phone number must be at least 10 digits').regex(/^[0-9]+$/, 'Phone number must contain only numbers'),
+  customerPhone: z.string().min(3, 'Phone number invalid (too short)'),
   customerEmail: z.string().email('Invalid email address').optional().or(z.literal('')),
   serviceId: z.string().min(1, 'Please select a service'),
   staffId: z.string().min(1, 'Please select a staff member'),

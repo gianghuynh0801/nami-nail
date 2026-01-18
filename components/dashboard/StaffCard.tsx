@@ -94,7 +94,6 @@ export default function StaffCard({
           </div>
           <div>
             <h3 className="font-semibold text-gray-900">{staff.staff.name}</h3>
-            <p className="text-xs text-gray-500">{staff.staff.phone}</p>
           </div>
         </div>
         <div className="flex items-center gap-1">

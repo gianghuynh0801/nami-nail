@@ -8,7 +8,6 @@ import { X, Clock, Settings } from 'lucide-react'
 
 const staffSchema = z.object({
   name: z.string().min(1, 'Staff name is required'),
-  phone: z.string().min(1, 'Phone number is required'),
 })
 
 type StaffFormData = z.infer<typeof staffSchema>
@@ -92,7 +91,6 @@ export default function StaffTab({ salonId, onUpdate }: { salonId: string; onUpd
     setEditingId(staffMember.id)
     reset({
       name: staffMember.name,
-      phone: staffMember.phone,
     })
   }
 
@@ -226,18 +224,6 @@ export default function StaffTab({ salonId, onUpdate }: { salonId: string; onUpd
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Phone Number
-            </label>
-            <input
-              {...register('phone')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-            />
-            {errors.phone && (
-              <p className="text-red-500 text-sm mt-1">{errors.phone.message}</p>
-            )}
-          </div>
         </div>
 
         <button
@@ -272,7 +258,6 @@ export default function StaffTab({ salonId, onUpdate }: { salonId: string; onUpd
             >
               <div>
                 <p className="font-medium text-gray-900">{staffMember.name}</p>
-                <p className="text-sm text-gray-600">{staffMember.phone}</p>
               </div>
               <div className="flex gap-2 flex-wrap">
                 <button

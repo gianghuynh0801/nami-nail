@@ -29,6 +29,7 @@ export interface CalendarAppointment {
   notes?: string
   checkedInAt?: string  // ISO string
   startedAt?: string    // ISO string
+  createdAt?: string    // ISO string
   queueNumber?: number
 }
 

@@ -9,7 +9,7 @@ import { format } from 'date-fns'
 
 const appointmentSchema = z.object({
   customerName: z.string().min(1, 'Customer name is required'),
-  customerPhone: z.string().min(10, 'Phone number must be at least 10 digits'),
+  customerPhone: z.string().min(3, 'Phone number invalid (too short)'),
   serviceId: z.string().min(1, 'Please select a service'),
   staffId: z.string().min(1, 'Please select a staff member'),
 })
@@ -44,6 +44,7 @@ export default function CreateAppointmentModal({
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm<AppointmentFormData>({
     resolver: zodResolver(appointmentSchema),
@@ -56,11 +57,56 @@ export default function CreateAppointmentModal({
     }
   }, [isOpen, reset])
 
+  // Availability check
+  const [checkingAvailability, setCheckingAvailability] = useState(false)
+  const [availabilityError, setAvailabilityError] = useState('')
+
+  const selectedStaffId = watch('staffId')
+  const selectedServiceId = watch('serviceId')
+
+  useEffect(() => {
+    const checkAvailability = async () => {
+      if (!selectedStaffId || !selectedServiceId || !startTime || !salonId) return
+      
+      setCheckingAvailability(true)
+      setAvailabilityError('')
+      
+      try {
+        const dateStr = format(startTime, 'yyyy-MM-dd')
+        const timeStr = format(startTime, 'HH:mm')
+        
+        const res = await fetch(
+          `/api/booking/available-times?salonId=${salonId}&staffId=${selectedStaffId}&serviceId=${selectedServiceId}&date=${dateStr}`
+        )
+        
+        if (res.ok) {
+          const data = await res.json()
+          const availableTimes = data.times || []
+          
+          if (!availableTimes.includes(timeStr)) {
+            setAvailabilityError('Nhân viên này đã bận hoặc không có lịch làm việc vào giờ này')
+          }
+        }
+      } catch (error) {
+        console.error('Error checking availability:', error)
+      } finally {
+        setCheckingAvailability(false)
+      }
+    }
+
+    // Debounce check
+    const timeoutId = setTimeout(checkAvailability, 500)
+    return () => clearTimeout(timeoutId)
+  }, [selectedStaffId, selectedServiceId, startTime, salonId])
+
   const onSubmit = async (data: AppointmentFormData) => {
+    if (availabilityError) return
+
     setLoading(true)
     setError('')
 
     try {
+      // ... (existing submit logic)
       console.log('Creating appointment:', {
         salonId,
         customerName: data.customerName,
@@ -217,6 +263,16 @@ export default function CreateAppointmentModal({
             {errors.staffId && (
               <p className="text-red-500 text-sm mt-1">{errors.staffId.message}</p>
             )}
+            {checkingAvailability && (
+              <p className="text-gray-500 text-sm mt-1 flex items-center gap-1">
+                <Clock className="w-3 h-3 animate-spin api-spin" /> Checking availability...
+              </p>
+            )}
+            {availabilityError && (
+              <p className="text-red-500 text-sm mt-1 font-medium bg-red-50 p-2 rounded-lg border border-red-100">
+                ⚠️ {availabilityError}
+              </p>
+            )}
           </div>
 
           {/* Actions */}
@@ -230,8 +286,8 @@ export default function CreateAppointmentModal({
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary-400 text-white rounded-xl hover:bg-primary-500 transition-all disabled:opacity-50 font-medium"
+              disabled={loading || !!availabilityError || checkingAvailability}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary-400 text-white rounded-xl hover:bg-primary-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
               <Save className="w-5 h-5" />
               {loading ? 'Creating...' : 'Create Appointment'}

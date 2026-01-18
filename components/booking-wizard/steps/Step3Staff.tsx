@@ -6,7 +6,7 @@ import type { Staff } from '../types'
 
 interface Step3StaffProps {
   salonId: string
-  serviceId: string
+  serviceIds: string[]
   selectedStaffId: string | null
   isAnyStaff: boolean
   onSelect: (staff: Staff | null, isAnyStaff: boolean) => void
@@ -22,7 +22,7 @@ const STAFF_COLORS = [
 
 export default function Step3Staff({ 
   salonId,
-  serviceId,
+  serviceIds,
   selectedStaffId, 
   isAnyStaff,
   onSelect, 
@@ -36,7 +36,7 @@ export default function Step3Staff({
     if (salonId) {
       fetchStaff()
     }
-  }, [salonId, serviceId])
+  }, [salonId, serviceIds])
 
   const fetchStaff = async () => {
     try {

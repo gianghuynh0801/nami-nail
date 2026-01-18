@@ -85,8 +85,9 @@ export async function POST(
     const updated = await prisma.appointment.update({
       where: { id: params.id },
       data: {
-        status: 'CHECKED_IN',
+        status: 'IN_PROGRESS',
         checkedInAt: new Date(),
+        startedAt: new Date(),
         queueNumber: nextQueueNumber,
         ...(staffId && staffId !== appointment.staffId && { staffId }),
       },

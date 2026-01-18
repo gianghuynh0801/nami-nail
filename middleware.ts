@@ -5,8 +5,8 @@ export default withAuth(
   function middleware(req) {
     const token = req.nextauth.token
     
-    // Chỉ OWNER và STAFF mới được truy cập dashboard
-    if (token?.role !== 'OWNER' && token?.role !== 'STAFF') {
+    // Chỉ OWNER, MANAGER và STAFF mới được truy cập dashboard
+    if (token?.role !== 'OWNER' && token?.role !== 'MANAGER' && token?.role !== 'STAFF') {
       return NextResponse.redirect(new URL('/auth/login', req.url))
     }
     

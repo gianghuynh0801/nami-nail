@@ -17,7 +17,7 @@ export default function Step7Success({
   onClose,
   onViewAppointment,
 }: Step7SuccessProps) {
-  const { salon, service, staff, isAnyStaff, selectedDate, selectedTime, customerInfo, createdAppointmentId } = state
+  const { salon, services, staff, isAnyStaff, selectedDate, selectedTime, customerInfo, createdAppointmentId } = state
 
   // Confetti effect on mount
   useEffect(() => {
@@ -28,6 +28,8 @@ export default function Step7Success({
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('vi-VN').format(price) + 'đ'
   }
+
+  const totalPrice = services.reduce((total, s) => total + s.price, 0)
 
   return (
     <div className="text-center space-y-6 py-4">
@@ -106,16 +108,18 @@ export default function Step7Success({
               <p className="font-medium text-gray-900">
                 {isAnyStaff ? 'Nhân viên sẽ được phân công' : staff?.name}
               </p>
-              <p className="text-sm text-gray-600">{service?.name}</p>
+              <div className="text-sm text-gray-600">
+                {services.map(s => s.name).join(', ')}
+              </div>
             </div>
           </div>
 
           {/* Price */}
-          {service && (
+          {services.length > 0 && (
             <div className="pt-3 mt-3 border-t border-primary-200">
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Tổng thanh toán</span>
-                <span className="text-xl font-bold text-primary-600">{formatPrice(service.price)}</span>
+                <span className="text-xl font-bold text-primary-600">{formatPrice(totalPrice)}</span>
               </div>
             </div>
           )}

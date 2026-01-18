@@ -9,6 +9,10 @@ const updateAppointmentSchema = z.object({
   notes: z.string().optional().nullable(),
   startTime: z.string().optional(),
   endTime: z.string().optional(),
+  customerName: z.string().min(1).optional(),
+  customerPhone: z.string().min(1).optional(),
+  serviceId: z.string().optional(),
+  staffId: z.string().optional(),
 })
 
 export async function PATCH(
@@ -41,24 +45,29 @@ export async function PATCH(
       )
     }
 
-    // Verify salon ownership
-    if (session.user.role !== 'OWNER' || appointment.salon.ownerId !== session.user.id) {
+    // Verify permissions - OWNER, MANAGER, or users with UPDATE_APPOINTMENT permission
+    const isOwner = session.user.role === 'OWNER' && appointment.salon.ownerId === session.user.id
+    const isManager = session.user.role === 'MANAGER' && session.user.permissions?.includes('UPDATE_APPOINTMENT')
+    const hasPermission = session.user.permissions?.includes('UPDATE_APPOINTMENT')
+    
+    if (!isOwner && !isManager && !hasPermission) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
       )
     }
 
-    // If updating time, check for overlaps
-    if (data.startTime || data.endTime) {
+    // If updating time or staff, check for overlaps
+    if (data.startTime || data.endTime || data.staffId) {
       const newStart = data.startTime ? new Date(data.startTime) : appointment.startTime
       const newEnd = data.endTime ? new Date(data.endTime) : appointment.endTime
+      const newStaffId = data.staffId || appointment.staffId
 
       // Check for overlapping appointments (excluding current appointment)
       const overlapping = await prisma.appointment.findFirst({
         where: {
           id: { not: params.id },
-          staffId: appointment.staffId,
+          staffId: newStaffId,
           salonId: appointment.salonId,
           status: { not: 'CANCELLED' },
           OR: [
@@ -100,6 +109,10 @@ export async function PATCH(
         ...(data.notes !== undefined && { notes: data.notes }),
         ...(data.startTime && { startTime: new Date(data.startTime) }),
         ...(data.endTime && { endTime: new Date(data.endTime) }),
+        ...(data.customerName && { customerName: data.customerName }),
+        ...(data.customerPhone && { customerPhone: data.customerPhone }),
+        ...(data.serviceId && { serviceId: data.serviceId }),
+        ...(data.staffId && { staffId: data.staffId }),
       },
       include: {
         service: true,

@@ -55,6 +55,7 @@ export const authOptions: NextAuthOptions = {
               email: user.email || user.phone || "",
               name: user.name,
               role: user.role,
+              permissions: [],
             };
           }
 
@@ -93,6 +94,7 @@ export const authOptions: NextAuthOptions = {
             email: user.email || user.phone || "",
             name: user.name,
             role: user.role,
+            permissions: user.permissions || [],
           };
         } catch (error: any) {
           console.error("❌ Error in authorize:", error?.message || error);
@@ -110,6 +112,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.role = user.role;
         token.id = user.id;
+        token.permissions = user.permissions;
       }
       return token;
     },
@@ -117,6 +120,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.role = token.role as string;
         session.user.id = token.id as string;
+        session.user.permissions = token.permissions as string[];
       }
       return session;
     },

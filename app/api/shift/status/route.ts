@@ -170,6 +170,24 @@ export async function GET(request: Request) {
       })
     )
 
+    // Sort staff:
+    // 1. By Priority Order (ASC)
+    // 2. By Revenue (ASC) - To equalize revenue (Lower revenue = Higher priority)
+    staffStats.sort((a, b) => {
+      // 1. Check priority availability (active/inactive) - Assuming all returned are active for now
+      // 2. Priority Order
+      const orderA = a.priority?.priorityOrder ?? 999
+      const orderB = b.priority?.priorityOrder ?? 999
+      
+      if (orderA !== orderB) {
+        return orderA - orderB
+      }
+
+      // 3. Revenue (ASC)
+      // If priorityOrder is same (e.g. both 1 or both undefined/999), sort by Revenue
+      return a.stats.revenue - b.stats.revenue
+    })
+
     return NextResponse.json({
       staff: staffStats,
       pendingAppointments: pending,

@@ -3,19 +3,25 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
-import {
-  LayoutDashboard,
-  Calendar,
-  Users,
-  FileText,
-  Building2,
-  BarChart3,
-  Clock,
-  CalendarDays,
-  CalendarClock,
+import { useSession } from "next-auth/react";
+
+import { 
+  LayoutDashboard, 
+  Calendar, 
+  CalendarClock, 
+  Sparkles, 
+  Users, 
+  FileText, 
+  Building2, 
+  BarChart3, 
+  Clock, 
+  CalendarDays, 
+  X, 
+  ChevronRight, 
+  ChevronLeft 
 } from "lucide-react";
+
+
 
 interface MenuItem {
   id: string;
@@ -34,6 +40,7 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose, isCollapsed = false, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname();
+  const { data: session } = useSession(); // Get session to check role
 
   const menuItems: MenuItem[] = [
     {
@@ -42,15 +49,21 @@ export default function Sidebar({ isOpen, onClose, isCollapsed = false, onToggle
       icon: <LayoutDashboard className="w-5 h-5" />,
       href: "/dashboard",
     },
+    // {
+    //   id: "appointments",
+    //   label: "Lịch hẹn",
+    //   icon: <Calendar className="w-5 h-5" />,
+    //   href: "/dashboard/appointments",
+    // },
     {
-      id: "appointments",
-      label: "Lịch hẹn",
-      icon: <Calendar className="w-5 h-5" />,
-      href: "/dashboard/appointments",
+      id: "services",
+      label: "Dịch vụ",
+      icon: <Sparkles className="w-5 h-5" />,
+      href: "/dashboard/services",
     },
     {
       id: "calendar",
-      label: "Lịch nhân viên",
+      label: "Lịch hẹn",
       icon: <CalendarClock className="w-5 h-5" />,
       href: "/dashboard/calendar",
     },
@@ -97,6 +110,16 @@ export default function Sidebar({ isOpen, onClose, isCollapsed = false, onToggle
       href: "/dashboard/shift-management",
     },
   ];
+
+  // Add User Management link for OWNER and MANAGER
+  if (session?.user?.role === 'OWNER' || session?.user?.role === 'MANAGER') {
+    menuItems.push({
+      id: "users",
+      label: "Quản lý User",
+      icon: <Users className="w-5 h-5 text-purple-500" />, // Use Users icon, maybe distinct color
+      href: "/dashboard/users",
+    });
+  }
 
   const isActive = (href?: string) => {
     if (!href) return false;

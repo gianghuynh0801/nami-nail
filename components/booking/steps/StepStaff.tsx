@@ -6,7 +6,6 @@ import { Users, User } from 'lucide-react'
 interface Staff {
   id: string
   name: string
-  phone: string
 }
 
 interface StepStaffProps {
@@ -69,7 +68,6 @@ export default function StepStaff({ salonId, serviceId, staff, selectedStaffId, 
                 </div>
                 <div className="flex-1">
                   <h3 className="font-semibold text-gray-900">{staffMember.name}</h3>
-                  <p className="text-sm text-gray-600">{staffMember.phone}</p>
                 </div>
                 {selectedStaffId === staffMember.id && (
                   <div className="w-6 h-6 bg-primary-400 rounded-full flex items-center justify-center flex-shrink-0">

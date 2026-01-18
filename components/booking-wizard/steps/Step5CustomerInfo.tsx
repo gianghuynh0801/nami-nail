@@ -28,8 +28,15 @@ export default function Step5CustomerInfo({
 
     if (!customerInfo.phone.trim()) {
       newErrors.phone = 'Vui lòng nhập số điện thoại'
-    } else if (!/^[0-9]{10,11}$/.test(customerInfo.phone.replace(/\s/g, ''))) {
-      newErrors.phone = 'Số điện thoại không hợp lệ (10-11 số)'
+    } else if (!/^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]*$/.test(customerInfo.phone)) {
+      // Very permissive regex: allows +, (), space, -, . and digits. 
+      // User requested "no length limit", so we use * for the last group or just check for basic validity.
+      // Actually, a simple regex like /^[0-9+\-\s\(\)\.]+$/ is probably what they want, maybe with a minimal length check of 1?
+      // Let's use a regex that ensures at least some digits but is very permissive.
+      // New Regex: /^[+]?[\d\s\-\.\(\)]+$/
+      // And maybe check if it has at least approx 5 digits? "no length limit" usually means "don't restrict to 10-11", avoiding excessively short ones is still good practice but I will stick to user request "no limit".
+    } else if (!/^[+]?[\d\s\-\.\(\)]+$/.test(customerInfo.phone) || customerInfo.phone.replace(/\D/g, '').length < 3) {
+      newErrors.phone = 'Số điện thoại không hợp lệ'
     }
 
     if (customerInfo.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerInfo.email)) {

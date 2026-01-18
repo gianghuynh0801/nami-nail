@@ -6,7 +6,6 @@ import { z } from 'zod'
 
 const staffSchema = z.object({
   name: z.string().min(1),
-  phone: z.string().min(1),
 })
 
 export async function GET(
@@ -74,12 +73,12 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { name, phone } = staffSchema.parse(body)
+    const { name } = staffSchema.parse(body)
 
     const staff = await prisma.staff.create({
       data: {
         name,
-        phone,
+        phone: '', // Default to empty string as it is not used in UI but required in DB
         salonId: params.id,
       },
     })

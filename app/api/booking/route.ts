@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 
@@ -8,7 +9,7 @@ const bookingSchema = z.object({
   customerName: z.string().min(1),
   customerPhone: z.string().min(1),
   customerEmail: z.string().email().optional().or(z.literal('')),
-  serviceId: z.string(),
+  serviceIds: z.array(z.string()).min(1),
   staffId: z.string(),
   startTime: z.string(),
   notes: z.string().optional(),
@@ -17,7 +18,7 @@ const bookingSchema = z.object({
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { salonId, customerName, customerPhone, customerEmail, serviceId, staffId, startTime, notes } =
+    const { salonId, customerName, customerPhone, customerEmail, serviceIds, staffId, startTime, notes } =
       bookingSchema.parse(body)
     
     // Normalize email - convert empty string to undefined
@@ -76,29 +77,47 @@ export async function POST(request: Request) {
       })
     }
 
-    // Lấy duration riêng của thợ cho dịch vụ
-    const staffService = await prisma.staffService.findUnique({
-      where: {
-        staffId_serviceId: {
-          staffId,
-          serviceId,
-        },
-      },
+    // Fetch all services
+    const services = await prisma.service.findMany({
+      where: { id: { in: serviceIds } }
     })
 
-    const service = await prisma.service.findUnique({
-      where: { id: serviceId },
-    })
-
-    if (!service) {
+    if (services.length !== serviceIds.length) {
       return NextResponse.json(
-        { error: 'Service not found' },
+        { error: 'Một số dịch vụ không tồn tại' },
         { status: 404 }
       )
     }
 
-    const duration = staffService?.duration ?? service.duration
-    const end = new Date(start.getTime() + duration * 60000)
+    // Calculate total duration considering staff overrides
+    let totalDuration = 0
+    // Use any[] to avoid build errors if Prisma types are not fully synchronized yet
+    const appointmentItemsData: any[] = []
+
+    for (const service of services) {
+      // Lấy duration riêng của thợ cho dịch vụ này (nếu có)
+      const staffService = await prisma.staffService.findUnique({
+        where: {
+          staffId_serviceId: {
+            staffId,
+            serviceId: service.id,
+          },
+        },
+      })
+
+      const duration = staffService?.duration ?? service.duration
+      totalDuration += duration
+
+      appointmentItemsData.push({
+        serviceId: service.id,
+        serviceName: service.name,
+        servicePrice: service.price, // Snapshot price
+        serviceDuration: duration,   // Snapshot duration
+        // Không cần appointmentId - Prisma tự điền khi dùng nested write
+      })
+    }
+
+    const end = new Date(start.getTime() + totalDuration * 60000)
 
     // Check for overlapping appointments
     const overlapping = await prisma.appointment.findFirst({
@@ -138,24 +157,35 @@ export async function POST(request: Request) {
       )
     }
 
+    // Transaction to create appointment and items
+    // Since we are using Prisma's nested writes, we can do it in one go (mostly)
+    // But appointmentServiceItems relation needs to be created.
+    
+    // Use the first serviceId for the main record (backward compatibility or main service)
+    const mainServiceId = serviceIds[0]
+
     const appointment = await prisma.appointment.create({
       data: {
         customerId: customer.id,
         salonId,
         customerName,
         customerPhone,
-        serviceId,
+        serviceId: mainServiceId,
         staffId,
         startTime: start,
         endTime: end,
-        status: 'PENDING',
+        status: 'CONFIRMED',
         notes: notes || undefined,
-      },
+        appointmentServiceItems: {
+          create: appointmentItemsData
+        }
+      } as any, // Cast to any to bypass stale types
       include: {
         service: true,
         staff: true,
         salon: true,
-      },
+        appointmentServiceItems: true,
+      } as any,
     })
 
     return NextResponse.json({ appointment }, { status: 201 })
@@ -207,4 +237,3 @@ export async function POST(request: Request) {
     )
   }
 }
-

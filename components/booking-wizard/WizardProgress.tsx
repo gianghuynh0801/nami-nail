@@ -16,10 +16,16 @@ const IconMap = {
 interface WizardProgressProps {
   state: WizardState
   onStepClick: (step: number) => void
+  hideBranchSelection?: boolean
 }
 
-export default function WizardProgress({ state, onStepClick }: WizardProgressProps) {
-  const { currentStep, completedSteps, salon, service, staff, isAnyStaff, selectedDate, selectedTime } = state
+export default function WizardProgress({ state, onStepClick, hideBranchSelection = false }: WizardProgressProps) {
+  const { currentStep, completedSteps, salon, services, staff, isAnyStaff, selectedDate, selectedTime } = state
+
+  // Filter out step 1 if hideBranchSelection is true
+  const visibleSteps = hideBranchSelection 
+    ? STEPS.filter(step => step.id !== 1)
+    : STEPS
 
   const getStepStatus = (stepId: number) => {
     if (completedSteps.includes(stepId)) return 'completed'
@@ -32,7 +38,12 @@ export default function WizardProgress({ state, onStepClick }: WizardProgressPro
       case 1:
         return salon?.name || null
       case 2:
-        return service?.name || null
+        if (services.length > 0) {
+          return services.length === 1 
+            ? services[0].name 
+            : `${services.length} dịch vụ`
+        }
+        return null
       case 3:
         return isAnyStaff ? 'Bất kỳ' : staff?.name || null
       case 4:
@@ -58,7 +69,7 @@ export default function WizardProgress({ state, onStepClick }: WizardProgressPro
       {/* Header - Mobile */}
       <div className="lg:hidden mb-4">
         <h3 className="text-lg font-semibold">
-          Bước {currentStep}/6
+          Bước {hideBranchSelection ? currentStep - 1 : currentStep}/{visibleSteps.length}
         </h3>
         <p className="text-sm text-primary-200">
           {STEPS[currentStep - 1]?.title}
@@ -67,7 +78,7 @@ export default function WizardProgress({ state, onStepClick }: WizardProgressPro
 
       {/* Progress Steps - Desktop */}
       <div className="hidden lg:block space-y-2">
-        {STEPS.map((step) => {
+        {visibleSteps.map((step) => {
           const status = getStepStatus(step.id)
           const Icon = IconMap[step.icon as keyof typeof IconMap]
           const value = getStepValue(step.id)
@@ -129,18 +140,18 @@ export default function WizardProgress({ state, onStepClick }: WizardProgressPro
       </div>
 
       {/* Progress Steps - Mobile (horizontal) */}
-      <div className="lg:hidden flex items-center justify-between">
-        {STEPS.map((step, index) => {
+      <div className="lg:hidden flex items-center justify-between px-2">
+        {visibleSteps.map((step, index) => {
           const status = getStepStatus(step.id)
           
           return (
-            <div key={step.id} className="flex items-center">
+            <div key={step.id} className="flex items-center flex-1">
               {/* Step dot */}
               <button
                 onClick={() => canClickStep(step.id) && onStepClick(step.id)}
                 disabled={!canClickStep(step.id)}
                 className={`
-                  w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium
+                  w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0
                   transition-all duration-200
                   ${status === 'completed' 
                     ? 'bg-green-500 text-white' 
@@ -153,15 +164,19 @@ export default function WizardProgress({ state, onStepClick }: WizardProgressPro
                 {status === 'completed' ? (
                   <Check className="w-4 h-4" />
                 ) : (
-                  step.id
+                  // Adjust step number display if branch is hidden
+                  hideBranchSelection ? step.id - 1 : step.id
                 )}
               </button>
               
               {/* Connector line */}
-              {index < STEPS.length - 1 && (
+              {index < visibleSteps.length - 1 && (
                 <div className={`
-                  w-4 sm:w-8 h-0.5 mx-1
-                  ${completedSteps.includes(step.id) ? 'bg-green-500' : 'bg-white/20'}
+                  h-0.5 mx-1 flex-1
+                  ${completedSteps.includes(step.id) && completedSteps.includes(visibleSteps[index + 1].id) 
+                    ? 'bg-green-500' 
+                    : 'bg-white/20'
+                  }
                 `} />
               )}
             </div>

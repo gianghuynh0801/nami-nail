@@ -24,8 +24,8 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         salonId: action.salon.id,
         salon: action.salon,
         // Reset dependent fields when salon changes
-        serviceId: null,
-        service: null,
+        serviceIds: [],
+        services: [],
         staffId: null,
         staff: null,
         isAnyStaff: false,
@@ -34,11 +34,33 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         completedSteps: state.completedSteps.filter(s => s < 1),
       }
     
-    case 'SET_SERVICE':
+    case 'SET_SERVICES':
       return {
         ...state,
-        serviceId: action.service.id,
-        service: action.service,
+        serviceIds: action.services.map(s => s.id),
+        services: action.services,
+        // Reset dependent fields when service changes
+        staffId: null,
+        staff: null,
+        isAnyStaff: false,
+        selectedTime: null,
+        completedSteps: state.completedSteps.filter(s => s < 2),
+      }
+
+    case 'TOGGLE_SERVICE':
+      const isSelected = state.serviceIds.includes(action.service.id)
+      let newServices: Service[]
+      
+      if (isSelected) {
+        newServices = state.services.filter(s => s.id !== action.service.id)
+      } else {
+        newServices = [...state.services, action.service]
+      }
+      
+      return {
+        ...state,
+        serviceIds: newServices.map(s => s.id),
+        services: newServices,
         // Reset dependent fields when service changes
         staffId: null,
         staff: null,
@@ -124,9 +146,14 @@ export function useWizardState(initialSalonId?: string) {
     dispatch({ type: 'COMPLETE_STEP', step: 1 })
   }, [])
 
-  const setService = useCallback((service: Service) => {
-    dispatch({ type: 'SET_SERVICE', service })
-    dispatch({ type: 'COMPLETE_STEP', step: 2 })
+  const setServices = useCallback((services: Service[]) => {
+    dispatch({ type: 'SET_SERVICES', services })
+    // If services are cleared, we might want to un-complete step 2, but for now we just update state
+    // Don't auto-complete step 2 here as user might want to select more
+  }, [])
+
+  const toggleService = useCallback((service: Service) => {
+    dispatch({ type: 'TOGGLE_SERVICE', service })
   }, [])
 
   const setStaff = useCallback((staff: Staff | null, isAnyStaff: boolean = false) => {
@@ -191,7 +218,7 @@ export function useWizardState(initialSalonId?: string) {
       case 1:
         return !!state.salonId
       case 2:
-        return !!state.serviceId
+        return state.serviceIds.length > 0
       case 3:
         return !!state.staffId || state.isAnyStaff
       case 4:
@@ -211,7 +238,8 @@ export function useWizardState(initialSalonId?: string) {
     setStep,
     completeStep,
     setSalon,
-    setService,
+    setServices,
+    toggleService,
     setStaff,
     setDate,
     setTime,

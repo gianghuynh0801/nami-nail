@@ -34,7 +34,7 @@ export default function BookingWizardModal({
   const {
     state,
     setSalon,
-    setService,
+    toggleService,
     setStaff,
     setDate,
     setTime,
@@ -54,7 +54,7 @@ export default function BookingWizardModal({
   useEffect(() => {
     if (isOpen) {
       reset()
-      // If initialSalonId provided, fetch salon data
+      // If initialSalonId provided, fetch and setup salon data
       if (initialSalonId) {
         fetchInitialData(initialSalonId, initialStaffId, initialDateTime)
       }
@@ -102,20 +102,15 @@ export default function BookingWizardModal({
                   completeDateTime() // Complete date/time step
                   // Skip to customer info step (step 5)
                   goToStep(5)
-                } else {
-                  // Staff not found, just go to step 2
-                  nextStep()
+                  return
                 }
-              } else {
-                nextStep()
               }
             } catch (error) {
               console.error('Error fetching staff:', error)
-              nextStep()
             }
-          } else {
-            nextStep() // Move to step 2
           }
+          // Just move to step 2 (service selection)
+          goToStep(2)
         }
       }
     } catch (error) {
@@ -124,7 +119,7 @@ export default function BookingWizardModal({
   }
 
   const handleConfirm = useCallback(async () => {
-    if (!state.salonId || !state.serviceId || !state.selectedDate || !state.selectedTime) {
+    if (!state.salonId || state.serviceIds.length === 0 || !state.selectedDate || !state.selectedTime) {
       throw new Error('Thiếu thông tin đặt lịch')
     }
 
@@ -137,8 +132,9 @@ export default function BookingWizardModal({
 
       if (state.isAnyStaff && !staffIdToUse) {
         // Fetch available staff for the selected time and choose based on priority
+        // Using serviceIds.join(',') for multi-service support
         const staffRes = await fetch(
-          `/api/booking/available-staff?salonId=${state.salonId}&date=${state.selectedDate}&time=${state.selectedTime}&serviceId=${state.serviceId}`
+          `/api/booking/available-staff?salonId=${state.salonId}&date=${state.selectedDate}&time=${state.selectedTime}&serviceIds=${state.serviceIds.join(',')}`
         )
         if (staffRes.ok) {
           const staffData = await staffRes.json()
@@ -161,7 +157,7 @@ export default function BookingWizardModal({
           customerName: state.customerInfo.name,
           customerPhone: state.customerInfo.phone,
           customerEmail: state.customerInfo.email || undefined,
-          serviceId: state.serviceId,
+          serviceIds: state.serviceIds, // Send array of IDs
           staffId: staffIdToUse,
           startTime: `${state.selectedDate}T${state.selectedTime}:00`,
           notes: state.customerInfo.notes || undefined,
@@ -216,6 +212,15 @@ export default function BookingWizardModal({
   const renderStep = () => {
     switch (state.currentStep) {
       case 1:
+        // If initialSalonId was provided, show loading instead of branch selection
+        if (initialSalonId) {
+          return (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-400"></div>
+              <span className="ml-3 text-gray-600">Đang tải...</span>
+            </div>
+          )
+        }
         return (
           <Step1Branch
             selectedSalonId={state.salonId}
@@ -228,8 +233,8 @@ export default function BookingWizardModal({
         return (
           <Step2Service
             salonId={state.salonId!}
-            selectedServiceId={state.serviceId}
-            onSelect={setService}
+            selectedServiceIds={state.serviceIds}
+            onToggle={toggleService}
             onNext={nextStep}
             onBack={prevStep}
           />
@@ -239,7 +244,7 @@ export default function BookingWizardModal({
         return (
           <Step3Staff
             salonId={state.salonId!}
-            serviceId={state.serviceId!}
+            serviceIds={state.serviceIds}
             selectedStaffId={state.staffId}
             isAnyStaff={state.isAnyStaff}
             onSelect={setStaff}
@@ -253,7 +258,7 @@ export default function BookingWizardModal({
           <Step4DateTime
             salonId={state.salonId!}
             staffId={state.staffId}
-            serviceId={state.serviceId!}
+            serviceIds={state.serviceIds}
             isAnyStaff={state.isAnyStaff}
             selectedDate={state.selectedDate}
             selectedTime={state.selectedTime}
@@ -319,6 +324,7 @@ export default function BookingWizardModal({
           <WizardProgress
             state={state}
             onStepClick={handleStepClick}
+            hideBranchSelection={!!initialSalonId}
           />
         )}
 

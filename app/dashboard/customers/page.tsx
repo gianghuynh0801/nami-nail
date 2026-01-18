@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Search, Plus, Edit, Phone, Mail, Calendar, MapPin } from 'lucide-react'
 import { format } from 'date-fns'
 import { vi } from 'date-fns/locale/vi'
+import CustomerModal from '@/components/customers/CustomerModal'
 
 interface Customer {
   id: string
@@ -26,6 +27,8 @@ export default function CustomersPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedSalonId, setSelectedSalonId] = useState<string>('')
   const [salons, setSalons] = useState<any[]>([])
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
 
   useEffect(() => {
     fetchSalons()
@@ -69,11 +72,28 @@ export default function CustomersPage() {
     }
   }
 
+  const handleAdd = () => {
+    setSelectedCustomer(null)
+    setIsModalOpen(true)
+  }
+
+  const handleEdit = (customer: Customer) => {
+    setSelectedCustomer(customer)
+    setIsModalOpen(true)
+  }
+
+  const handleSuccess = () => {
+    fetchCustomers()
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-bold text-gray-800">Quản lý Khách hàng</h1>
-        <button className="flex items-center gap-2 px-4 py-2 bg-primary-400 text-white rounded-lg hover:bg-primary-500 transition-colors">
+        <button 
+          onClick={handleAdd}
+          className="flex items-center gap-2 px-4 py-2 bg-primary-400 text-white rounded-lg hover:bg-primary-500 transition-colors"
+        >
           <Plus className="w-5 h-5" />
           Thêm khách hàng
         </button>
@@ -186,7 +206,10 @@ export default function CustomersPage() {
                       {format(new Date(customer.createdAt), 'dd/MM/yyyy', { locale: vi })}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button className="text-primary-600 hover:text-primary-900">
+                      <button 
+                        onClick={() => handleEdit(customer)}
+                        className="text-primary-600 hover:text-primary-900"
+                      >
                         <Edit className="w-5 h-5" />
                       </button>
                     </td>
@@ -197,6 +220,13 @@ export default function CustomersPage() {
           </div>
         </div>
       )}
+
+      <CustomerModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={handleSuccess}
+        customer={selectedCustomer}
+      />
     </div>
   )
 }

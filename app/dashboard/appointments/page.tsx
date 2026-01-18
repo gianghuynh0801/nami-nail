@@ -9,20 +9,22 @@ import { DndProvider } from 'react-dnd'
 import { MultiBackend } from 'react-dnd-multi-backend'
 import { HTML5toTouch } from 'rdndmb-html5-to-touch'
 import moment from 'moment'
+import { BookingWizardModal } from '@/components/booking-wizard'
 import EventDetailModal from '@/components/dashboard/EventDetailModal'
-import CreateAppointmentModal from '@/components/dashboard/CreateAppointmentModal'
 import CustomEvent from '@/components/dashboard/CustomEvent'
 import WeeklyTimelineView from '@/components/dashboard/WeeklyTimelineView'
+import { useSalonContext } from '@/contexts/SalonContext'
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css'
 
 const localizer = momentLocalizer(moment)
 const DragAndDropCalendar = withDragAndDrop(Calendar)
 
 export default function AppointmentsPage() {
+  // Use salon from global context instead of local state
+  const { selectedSalonId, selectedSalon, loading: salonLoading } = useSalonContext()
+  
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [view, setView] = useState<View>('month')
-  const [salons, setSalons] = useState<any[]>([])
-  const [selectedSalonId, setSelectedSalonId] = useState<string>('')
   const [appointments, setAppointments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null)
@@ -35,14 +37,13 @@ export default function AppointmentsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [useTimelineView, setUseTimelineView] = useState(false)
 
-  useEffect(() => {
-    fetchSalons()
-  }, [])
-
+  // Fetch data when salon changes
   useEffect(() => {
     if (selectedSalonId) {
       fetchAppointments()
       fetchSalonData()
+    } else {
+      setLoading(false)
     }
   }, [selectedSalonId, view, selectedDate])
 
@@ -67,28 +68,6 @@ export default function AppointmentsPage() {
       }
     } catch (error) {
       console.error('Error fetching salon data:', error)
-    }
-  }
-
-  const fetchSalons = async () => {
-    try {
-      const res = await fetch('/api/salon')
-      if (res.ok) {
-        const data = await res.json()
-        setSalons(data.salons || [])
-        if (data.salons && data.salons.length > 0) {
-          setSelectedSalonId(data.salons[0].id)
-        } else {
-          setLoading(false)
-        }
-      } else {
-        const error = await res.json()
-        console.error('Error fetching salons:', error)
-        setLoading(false)
-      }
-    } catch (error) {
-      console.error('Error fetching salons:', error)
-      setLoading(false)
     }
   }
 
@@ -342,27 +321,21 @@ export default function AppointmentsPage() {
 
       {/* Control Bar */}
       <div className="bg-white rounded-lg shadow-sm p-3 md:p-4 space-y-3 md:space-y-0 md:flex md:items-center md:gap-3 md:flex-wrap">
-        {/* First Row - Mobile: Full width, Desktop: Auto */}
+        {/* First Row - Search only (no salon dropdown, using context) */}
         <div className="flex flex-col sm:flex-row gap-3 flex-1 min-w-0">
-          {/* Dropdown - Salon filter */}
-          <select
-            value={selectedSalonId}
-            onChange={(e) => setSelectedSalonId(e.target.value)}
-            className="w-full sm:w-auto px-3 md:px-4 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
-          >
-            {salons.map((salon) => (
-              <option key={salon.id} value={salon.id}>
-                {salon.name}
-              </option>
-            ))}
-          </select>
+          {/* Current Salon Display */}
+          {selectedSalon && (
+            <div className="px-4 py-2 bg-primary-50 border border-primary-200 rounded-lg text-sm font-medium text-primary-700">
+              {selectedSalon.name}
+            </div>
+          )}
 
           {/* Search */}
           <div className="flex-1 min-w-0 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by name, phone"
+              placeholder="Tìm theo tên, số điện thoại"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 md:pl-10 pr-4 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -462,15 +435,14 @@ export default function AppointmentsPage() {
 
       {/* Calendar */}
       <div className="bg-white rounded-lg shadow-sm p-4 md:p-6">
-        {salons.length === 0 ? (
+        {salonLoading ? (
           <div className="text-center py-12">
-            <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-              <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-            </div>
-            <p className="text-gray-400 text-lg mb-2">Bạn chưa có salon nào</p>
-            <p className="text-gray-500 text-sm">Vui lòng tạo salon trước khi xem lịch hẹn</p>
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-400"></div>
+            <p className="mt-4 text-gray-600">Đang tải...</p>
+          </div>
+        ) : !selectedSalonId ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500">Vui lòng chọn chi nhánh từ menu trên cùng.</p>
           </div>
         ) : loading ? (
           <div className="text-center py-12">
@@ -538,26 +510,24 @@ export default function AppointmentsPage() {
         onUpdate={handleUpdate}
       />
 
-      {/* Create Appointment Modal */}
-      {selectedSlot && (
-        <CreateAppointmentModal
-          isOpen={isCreateModalOpen}
-          onClose={() => {
-            setIsCreateModalOpen(false)
-            setSelectedSlot(null)
-          }}
-          onSuccess={() => {
-            fetchAppointments()
-            setIsCreateModalOpen(false)
-            setSelectedSlot(null)
-          }}
-          salonId={selectedSalonId}
-          startTime={selectedSlot.start}
-          endTime={selectedSlot.end}
-          services={services}
-          staff={staff}
-        />
-      )}
+      {/* Booking Wizard Modal */}
+      <BookingWizardModal
+        isOpen={isCreateModalOpen}
+        onClose={() => {
+          setIsCreateModalOpen(false)
+          setSelectedSlot(null)
+        }}
+        initialSalonId={selectedSalonId || undefined}
+        initialDateTime={selectedSlot ? {
+           date: format(selectedSlot.start, 'yyyy-MM-dd'),
+           time: format(selectedSlot.start, 'HH:mm')
+        } : undefined}
+        onSuccess={() => {
+          fetchAppointments()
+          setIsCreateModalOpen(false)
+          setSelectedSlot(null)
+        }}
+      />
     </div>
   )
 }

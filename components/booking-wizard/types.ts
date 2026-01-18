@@ -47,8 +47,8 @@ export interface WizardState {
   salon: Salon | null
   
   // Step 2: Service
-  serviceId: string | null
-  service: Service | null
+  serviceIds: string[]
+  services: Service[]
   
   // Step 3: Staff
   staffId: string | null  // null means "any staff"
@@ -74,7 +74,8 @@ export type WizardAction =
   | { type: 'SET_STEP'; step: number }
   | { type: 'COMPLETE_STEP'; step: number }
   | { type: 'SET_SALON'; salon: Salon }
-  | { type: 'SET_SERVICE'; service: Service }
+  | { type: 'SET_SERVICES'; services: Service[] }
+  | { type: 'TOGGLE_SERVICE'; service: Service }
   | { type: 'SET_STAFF'; staff: Staff | null; isAnyStaff: boolean }
   | { type: 'SET_DATE'; date: string }
   | { type: 'SET_TIME'; time: string }
@@ -106,8 +107,8 @@ export const initialWizardState: WizardState = {
   completedSteps: [],
   salonId: null,
   salon: null,
-  serviceId: null,
-  service: null,
+  serviceIds: [],
+  services: [],
   staffId: null,
   staff: null,
   isAnyStaff: false,

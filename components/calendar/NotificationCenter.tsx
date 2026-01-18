@@ -15,6 +15,7 @@ interface Notification {
   customerName: string
   message: string
   waitingMinutes: number
+  type: 'wait' | 'new'
 }
 
 export default function NotificationCenter({ appointments }: NotificationCenterProps) {
@@ -26,17 +27,37 @@ export default function NotificationCenter({ appointments }: NotificationCenterP
     const newNotifications: Notification[] = []
 
     appointments.forEach(apt => {
+      // Check for checked-in appointments waiting > 30 minutes
       if (apt.status === 'CHECKED_IN' && apt.checkedInAt && !apt.startedAt) {
         const checkedIn = parseISO(apt.checkedInAt)
         const minutes = differenceInMinutes(now, checkedIn)
         
         if (minutes >= 30) {
           newNotifications.push({
-            id: apt.id,
+            id: `wait-${apt.id}`,
             appointmentId: apt.id,
             customerName: apt.customerName,
             message: `Khách ${apt.customerName} đã chờ ${minutes} phút`,
             waitingMinutes: minutes,
+            type: 'wait',
+          })
+        }
+      }
+
+      // Check for new appointments (created within last 5 minutes)
+      // Note: createdAt should be available from backend mapping
+      if (apt.createdAt) {
+        const created = parseISO(apt.createdAt)
+        const minutesSinceCreation = differenceInMinutes(now, created)
+        
+        if (minutesSinceCreation < 5) { // 5 minutes window for new booking alert
+          newNotifications.push({
+            id: `new-${apt.id}`,
+            appointmentId: apt.id,
+            customerName: apt.customerName,
+            message: `Có lịch đặt mới từ ${apt.customerName}`,
+            waitingMinutes: 0,
+            type: 'new',
           })
         }
       }
@@ -83,10 +104,14 @@ export default function NotificationCenter({ appointments }: NotificationCenterP
             {notifications.map((notif) => (
               <div
                 key={notif.id}
-                className="p-3 hover:bg-red-50 transition-colors"
+                className={`p-3 transition-colors ${
+                  notif.type === 'new' ? 'hover:bg-blue-50 bg-blue-50/50' : 'hover:bg-red-50'
+                }`}
               >
                 <div className="flex items-start gap-2">
-                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <AlertCircle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                    notif.type === 'new' ? 'text-blue-500' : 'text-red-500'
+                  }`} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900">
                       {notif.customerName}

@@ -11,7 +11,11 @@ export default function TimeColumn() {
           className="border-b border-beige-dark/50 relative"
           style={{ height: CALENDAR_CONFIG.HOUR_HEIGHT }}
         >
-          <span className="absolute -top-2.5 left-2 text-xs font-medium text-primary-700 bg-beige-light px-1">
+          <span 
+            className={`absolute left-2 text-xs font-medium text-primary-700 bg-beige-light px-1 ${
+              hour === 0 ? 'top-0' : '-top-2.5'
+            }`}
+          >
             {hour.toString().padStart(2, '0')}:00
           </span>
         </div>

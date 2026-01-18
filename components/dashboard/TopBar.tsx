@@ -1,10 +1,11 @@
 'use client'
 
 import { useSession, signOut } from 'next-auth/react'
-import { Bell, User, LogOut, Menu, Plus } from 'lucide-react'
+import { Bell, User, LogOut, Menu, Plus, ChevronDown, Building2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useState, useEffect } from 'react'
 import { BookingWizardModal } from '@/components/booking-wizard'
+import { useSalonContext } from '@/contexts/SalonContext'
 
 interface TopBarProps {
   onMenuClick: () => void
@@ -12,9 +13,11 @@ interface TopBarProps {
 
 export default function TopBar({ onMenuClick }: TopBarProps) {
   const { data: session } = useSession()
+  const { salons, selectedSalonId, selectedSalon, setSelectedSalonId, loading: salonsLoading } = useSalonContext()
   const [currentTime, setCurrentTime] = useState<Date | null>(null)
   const [showBookingWizard, setShowBookingWizard] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
+  const [showSalonDropdown, setShowSalonDropdown] = useState(false)
 
   useEffect(() => {
     setIsMounted(true)
@@ -42,10 +45,62 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
           <Menu className="w-6 h-6 text-gray-600" />
         </button>
 
-        {/* Title */}
-        <div className="text-base lg:text-lg font-playfair font-semibold text-primary-600 flex-1 lg:flex-initial">
-          <span className="hidden sm:inline">NAMI Nail Management</span>
-          <span className="sm:hidden">NAMI</span>
+        {/* Left side: Title + Salon Selector */}
+        <div className="flex items-center gap-4 flex-1 lg:flex-initial">
+          {/* Title */}
+          <div className="text-base lg:text-lg font-playfair font-semibold text-primary-600">
+            <span className="hidden sm:inline">NAMI Nail Management</span>
+            <span className="sm:hidden">NAMI</span>
+          </div>
+
+          {/* Salon Selector Dropdown */}
+          {salons.length > 0 && (
+            <div className="relative hidden md:block">
+              <button
+                onClick={() => setShowSalonDropdown(!showSalonDropdown)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors text-sm"
+              >
+                <Building2 className="w-4 h-4 text-primary-500" />
+                <span className="max-w-[150px] truncate text-gray-700 font-medium">
+                  {selectedSalon?.name || 'Chọn chi nhánh'}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showSalonDropdown ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {/* Dropdown menu */}
+              {showSalonDropdown && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-10" 
+                    onClick={() => setShowSalonDropdown(false)}
+                  />
+                  <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                    <div className="px-3 py-2 text-xs text-gray-500 font-medium uppercase tracking-wide border-b">
+                      Chi nhánh
+                    </div>
+                    {salons.map((salon) => (
+                      <button
+                        key={salon.id}
+                        onClick={() => {
+                          setSelectedSalonId(salon.id)
+                          setShowSalonDropdown(false)
+                        }}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-primary-50 transition-colors flex items-center gap-2 ${
+                          salon.id === selectedSalonId ? 'bg-primary-50 text-primary-700' : 'text-gray-700'
+                        }`}
+                      >
+                        <Building2 className={`w-4 h-4 ${salon.id === selectedSalonId ? 'text-primary-500' : 'text-gray-400'}`} />
+                        <div>
+                          <p className="font-medium">{salon.name}</p>
+                          <p className="text-xs text-gray-500 truncate">{salon.address}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right side */}
@@ -101,6 +156,7 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
       <BookingWizardModal
         isOpen={showBookingWizard}
         onClose={() => setShowBookingWizard(false)}
+        initialSalonId={selectedSalonId || undefined}
         onSuccess={(appointmentId) => {
           console.log('Booking created from TopBar:', appointmentId)
         }}

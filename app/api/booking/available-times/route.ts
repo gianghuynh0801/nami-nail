@@ -8,44 +8,53 @@ export async function GET(request: NextRequest) {
     const salonId = searchParams.get('salonId')
     const staffId = searchParams.get('staffId')
     const serviceId = searchParams.get('serviceId')
+    const serviceIdsParam = searchParams.get('serviceIds')
     const date = searchParams.get('date')
+    const includeDetails = searchParams.get('includeDetails') === 'true'
 
-    if (!salonId || !staffId || !serviceId || !date) {
+    if (!salonId || !staffId || (!serviceId && !serviceIdsParam) || !date) {
       return NextResponse.json(
         { error: 'Missing parameters' },
         { status: 400 }
       )
     }
 
-    const service = await prisma.service.findUnique({
-      where: { id: serviceId },
-    })
+    // Determine service IDs
+    const serviceIds = serviceIdsParam ? serviceIdsParam.split(',') : (serviceId ? [serviceId] : [])
 
-    if (!service) {
-      return NextResponse.json(
-        { error: 'Service not found' },
-        { status: 404 }
-      )
+    if (serviceIds.length === 0) {
+       return NextResponse.json({ error: 'No services selected' }, { status: 400 })
     }
 
-    // Lấy duration riêng của thợ này cho dịch vụ này
-    const staffService = await prisma.staffService.findUnique({
-      where: {
-        staffId_serviceId: {
-          staffId,
-          serviceId,
-        },
-      },
+    // Fetch all services
+    const services = await prisma.service.findMany({
+      where: { id: { in: serviceIds } },
     })
 
-    // Sử dụng duration của thợ nếu có, nếu không thì dùng duration mặc định của dịch vụ
-    const duration = staffService?.duration ?? service.duration
+    if (services.length !== serviceIds.length) {
+       return NextResponse.json({ error: 'Some services not found' }, { status: 404 })
+    }
+
+    // Calculate total duration
+    let totalDuration = 0
+    for (const service of services) {
+       // Check for staff-specific duration
+       const staffService = await prisma.staffService.findUnique({
+          where: {
+             staffId_serviceId: {
+                staffId,
+                serviceId: service.id
+             }
+          }
+       })
+       totalDuration += staffService?.duration ?? service.duration
+    }
 
     // Get staff schedule for the selected day
     const selectedDateObj = new Date(date)
     const dayOfWeek = selectedDateObj.getDay() // 0 = Sunday, 1 = Monday, etc.
 
-    const schedule = await prisma.staffSchedule.findFirst({
+    let schedule = await prisma.staffSchedule.findFirst({
       where: {
         staffId,
         dayOfWeek,
@@ -56,27 +65,55 @@ export async function GET(request: NextRequest) {
       },
     })
 
+    // Fallback to salon working hours if no staff schedule
+    let scheduleTimes = { startTime: '', endTime: '', breakStart: null as string | null, breakEnd: null as string | null }
+    
     if (!schedule) {
-      // No schedule for this day, return empty with reason
-      return NextResponse.json({ 
-        times: [],
-        reason: 'NO_SCHEDULE',
-        message: 'Nhân viên chưa có lịch làm việc cho ngày này'
+      // Try salon working hours as fallback
+      const salonHours = await prisma.salonWorkingHours.findFirst({
+        where: {
+          salonId,
+          dayOfWeek,
+          isOpen: true,
+        },
       })
+      
+      if (salonHours) {
+        scheduleTimes = {
+          startTime: salonHours.startTime,
+          endTime: salonHours.endTime,
+          breakStart: null,
+          breakEnd: null,
+        }
+      } else {
+        // No schedule and no salon hours for this day
+        return NextResponse.json({ 
+          times: [],
+          reason: 'NO_SCHEDULE',
+          message: 'Salon không mở cửa vào ngày này'
+        })
+      }
+    } else {
+      scheduleTimes = {
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        breakStart: schedule.breakStart || null,
+        breakEnd: schedule.breakEnd || null,
+      }
     }
 
     // Parse schedule times
-    const [startHour, startMin] = schedule.startTime.split(':').map(Number)
-    const [endHour, endMin] = schedule.endTime.split(':').map(Number)
+    const [startHour, startMin] = scheduleTimes.startTime.split(':').map(Number)
+    const [endHour, endMin] = scheduleTimes.endTime.split(':').map(Number)
     const scheduleStart = startHour * 60 + startMin
     const scheduleEnd = endHour * 60 + endMin
 
     // Parse break times if exists
     let breakStart: number | null = null
     let breakEnd: number | null = null
-    if (schedule.breakStart && schedule.breakEnd) {
-      const [breakStartHour, breakStartMin] = schedule.breakStart.split(':').map(Number)
-      const [breakEndHour, breakEndMin] = schedule.breakEnd.split(':').map(Number)
+    if (scheduleTimes.breakStart && scheduleTimes.breakEnd) {
+      const [breakStartHour, breakStartMin] = scheduleTimes.breakStart.split(':').map(Number)
+      const [breakEndHour, breakEndMin] = scheduleTimes.breakEnd.split(':').map(Number)
       breakStart = breakStartHour * 60 + breakStartMin
       breakEnd = breakEndHour * 60 + breakEndMin
     }
@@ -101,40 +138,11 @@ export async function GET(request: NextRequest) {
     })
 
     // Generate time slots based on schedule
-    const timeSlots: string[] = []
+    const timeSlots: any[] = []
 
-    // Generate slots for all 24 hours
-    for (let hour = 0; hour < 24; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const slotStart = setMinutes(setHours(startOfSelectedDay, hour), minute)
-        const slotEnd = addMinutes(slotStart, duration)
-
-        // Check if slot is in the past
-        if (isBefore(slotStart, new Date())) {
-          continue
-        }
-
-        // Check if slot is within schedule
-        const slotStartMinutes = hour * 60 + minute
-        const slotEndMinutes = slotStartMinutes + duration
-
-        if (slotStartMinutes < scheduleStart || slotEndMinutes > scheduleEnd) {
-          continue // Outside working hours
-        }
-
-        // Check if slot overlaps with break time
-        if (breakStart !== null && breakEnd !== null) {
-          if (
-            (slotStartMinutes >= breakStart && slotStartMinutes < breakEnd) ||
-            (slotEndMinutes > breakStart && slotEndMinutes <= breakEnd) ||
-            (slotStartMinutes < breakStart && slotEndMinutes > breakEnd)
-          ) {
-            continue // Overlaps with break time
-          }
-        }
-
-        // Check if slot overlaps with existing appointments
-        const hasOverlap = appointments.some((apt) => {
+    // Helper to check overlap
+    const checkOverlap = (slotStart: Date, slotEnd: Date) => {
+       return appointments.some((apt) => {
           const aptStart = new Date(apt.startTime)
           const aptEnd = new Date(apt.endTime)
           return (
@@ -142,10 +150,60 @@ export async function GET(request: NextRequest) {
             (slotStart >= aptStart && slotStart < aptEnd) ||
             (slotEnd > aptStart && slotEnd <= aptEnd)
           )
-        })
+       })
+    }
 
-        if (!hasOverlap) {
-          timeSlots.push(format(slotStart, 'HH:mm'))
+    // Generate slots for all 24 hours
+    for (let hour = 0; hour < 24; hour++) {
+      for (let minute = 0; minute < 60; minute += 30) {
+        const slotStart = setMinutes(setHours(startOfSelectedDay, hour), minute)
+        const slotEnd = addMinutes(slotStart, totalDuration) // Use total duration
+
+        // Check if slot is in the past
+        if (isBefore(slotStart, new Date())) {
+           continue
+        }
+
+        // Check if slot is within schedule
+        const slotStartMinutes = hour * 60 + minute
+        const slotEndMinutes = slotStartMinutes + totalDuration
+
+        if (slotStartMinutes < scheduleStart || slotEndMinutes > scheduleEnd) {
+          continue // Outside working hours
+        }
+
+        // Check if slot overlaps with break time
+        let isBreak = false
+        if (breakStart !== null && breakEnd !== null) {
+          if (
+            (slotStartMinutes >= breakStart && slotStartMinutes < breakEnd) ||
+            (slotEndMinutes > breakStart && slotEndMinutes <= breakEnd) ||
+            (slotStartMinutes < breakStart && slotEndMinutes > breakEnd)
+          ) {
+            isBreak = true
+          }
+        }
+
+        if (isBreak) {
+           if (includeDetails) {
+              timeSlots.push({ time: format(slotStart, 'HH:mm'), available: false, reason: 'break' })
+           }
+           continue
+        }
+
+        // Check if slot overlaps with existing appointments
+        const hasOverlap = checkOverlap(slotStart, slotEnd)
+
+        if (hasOverlap) {
+           if (includeDetails) {
+              timeSlots.push({ time: format(slotStart, 'HH:mm'), available: false, reason: 'booked' })
+           }
+        } else {
+           if (includeDetails) {
+              timeSlots.push({ time: format(slotStart, 'HH:mm'), available: true })
+           } else {
+              timeSlots.push(format(slotStart, 'HH:mm'))
+           }
         }
       }
     }
@@ -158,6 +216,7 @@ export async function GET(request: NextRequest) {
         : undefined
     })
   } catch (error) {
+    console.error('Error in available-times:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
