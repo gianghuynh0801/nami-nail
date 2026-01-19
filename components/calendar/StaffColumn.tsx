@@ -5,6 +5,7 @@ import { getHours, getMinutes, parseISO } from 'date-fns'
 import AppointmentBlock from './AppointmentBlock'
 import TimeSlot from './TimeSlot'
 import { CALENDAR_CONFIG, HOURS } from './constants'
+import { checkWorkingHour } from './utils'
 import type { CalendarStaff, CalendarAppointment, DragState } from './types'
 
 interface StaffColumnProps {
@@ -28,28 +29,8 @@ export default function StaffColumn({
 }: StaffColumnProps) {
   
   const isWorkingHour = useCallback((hour: number, minute: number): 'working' | 'break' | false => {
-    if (!staff.workingHours) return false
-    
-    const time = hour * 60 + minute
-    const [startH, startM] = staff.workingHours.start.split(':').map(Number)
-    const [endH, endM] = staff.workingHours.end.split(':').map(Number)
-    const startTime = startH * 60 + startM
-    const endTime = endH * 60 + endM
-    
-    // Check if in break time
-    if (staff.workingHours.breakStart && staff.workingHours.breakEnd) {
-      const [breakStartH, breakStartM] = staff.workingHours.breakStart.split(':').map(Number)
-      const [breakEndH, breakEndM] = staff.workingHours.breakEnd.split(':').map(Number)
-      const breakStart = breakStartH * 60 + breakStartM
-      const breakEnd = breakEndH * 60 + breakEndM
-      
-      if (time >= breakStart && time < breakEnd) {
-        return 'break'
-      }
-    }
-    
-    return time >= startTime && time < endTime ? 'working' : false
-  }, [staff.workingHours])
+    return checkWorkingHour(staff, hour, minute)
+  }, [staff])
 
   const getAppointmentPosition = useCallback((appointment: CalendarAppointment) => {
     const start = parseISO(appointment.startTime)
@@ -114,6 +95,13 @@ export default function StaffColumn({
     const slotDateTime = new Date(selectedDate)
     slotDateTime.setHours(clickedHour, roundedMinute, 0, 0)
     slotDateTime.setSeconds(0, 0)
+    
+    // Check if slot is in the past
+    const now = new Date()
+    if (slotDateTime < now) {
+      return
+    }
+    
     const slotEndDateTime = new Date(slotDateTime)
     slotEndDateTime.setMinutes(slotEndDateTime.getMinutes() + 15)
     
@@ -124,16 +112,6 @@ export default function StaffColumn({
     })
     
     if (hasAppointment) return
-    
-    console.log('✅ Column clicked!', { 
-      staffId: staff.id, 
-      staffName: staff.name,
-      time, 
-      date: selectedDate,
-      clickedHour,
-      roundedMinute,
-      clickY
-    })
     
     onTimeSlotClick(staff.id, time, selectedDate)
   }, [onTimeSlotClick, staff, selectedDate, isWorkingHour])
@@ -146,6 +124,8 @@ export default function StaffColumn({
         minWidth: CALENDAR_CONFIG.COLUMN_MIN_WIDTH,
       }}
       onClick={handleColumnClick}
+      data-staff-column="true"
+      data-staff-id={staff.id}
     >
       {/* Hour grid lines */}
       {HOURS.map((hour) => (
@@ -166,6 +146,10 @@ export default function StaffColumn({
             const slotEndDateTime = new Date(slotDateTime)
             slotEndDateTime.setMinutes(slotEndDateTime.getMinutes() + 15)
             
+            // Check if slot is in the past
+            const now = new Date()
+            const isPast = slotDateTime < now
+            
             const hasAppointment = staff.appointments.some((apt) => {
               const aptStart = parseISO(apt.startTime)
               const aptEnd = parseISO(apt.endTime)
@@ -181,6 +165,7 @@ export default function StaffColumn({
                 minute={minute}
                 isWorking={workingStatus === 'working'}
                 isBreak={workingStatus === 'break'}
+                isPast={isPast}
                 isDropTarget={isDropTarget}
                 onDrop={onDrop}
                 onClick={undefined}
@@ -198,7 +183,7 @@ export default function StaffColumn({
           const isDragging = dragState.draggedAppointment?.id === appointment.id
           
           return (
-            <div key={appointment.id} className="pointer-events-auto" data-appointment={appointment.id}>
+            <div key={appointment.id} className="pointer-events-none" data-appointment={appointment.id}>
               <AppointmentBlock
                 appointment={appointment}
                 top={top}

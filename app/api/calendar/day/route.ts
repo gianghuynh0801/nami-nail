@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { startOfDay, endOfDay, parseISO } from 'date-fns'
+import { startOfDay, endOfDay, parseISO, isSameDay } from 'date-fns'
 
 export async function GET(request: Request) {
   try {
@@ -45,7 +45,12 @@ export async function GET(request: Request) {
           where: {
             OR: [
               { dayOfWeek, date: null },
-              { date: dayStart },
+              { 
+                date: {
+                  gte: dayStart,
+                  lte: dayEnd
+                }
+              },
             ],
           },
         },
@@ -69,9 +74,9 @@ export async function GET(request: Request) {
       return priorityA - priorityB
     })
 
-    // Get waiting list (pending appointments that are not assigned to any staff)
-    // First, get all pending appointments
-    const allPendingAppointments = await prisma.appointment.findMany({
+    // Get waiting list - tất cả appointments PENDING (chờ xác nhận) 
+    // để admin có thể xem và xác nhận, dù đã gán nhân viên hay chưa
+    const waitingList = await prisma.appointment.findMany({
       where: {
         salonId,
         status: 'PENDING',
@@ -79,17 +84,10 @@ export async function GET(request: Request) {
       },
       include: {
         service: true,
+        staff: true, // Include staff info để hiển thị nhân viên đã gán
       },
       orderBy: { createdAt: 'asc' },
     })
-    
-    // Filter out appointments that are already assigned to staff
-    const assignedAppointmentIds = new Set(
-      staffList.flatMap(s => s.appointments.map(a => a.id))
-    )
-    const waitingList = allPendingAppointments.filter(
-      apt => !assignedAppointmentIds.has(apt.id)
-    )
 
     // Staff avatar colors
     const STAFF_COLORS = [
@@ -98,8 +96,15 @@ export async function GET(request: Request) {
     ]
 
     // Transform data
+    // Transform data
     const staff = sortedStaff.map((s, index) => {
-      const schedule = s.schedules[0]
+      // Find the best matching schedule
+      // Priority: 1. Specific Date, 2. Recurring Day
+      const specificSchedule = s.schedules.find(sch => sch.date && isSameDay(sch.date, dayStart))
+      const recurringSchedule = s.schedules.find(sch => !sch.date && sch.dayOfWeek === dayOfWeek)
+      
+      const schedule = specificSchedule || recurringSchedule
+
       return {
         id: s.id,
         name: s.name,
@@ -149,6 +154,13 @@ export async function GET(request: Request) {
           duration: apt.service.duration,
         },
         notes: apt.notes || undefined,
+        status: apt.status,
+        createdAt: apt.createdAt.toISOString(),
+        startTime: apt.startTime.toISOString(),
+        assignedStaff: apt.staff ? {
+          id: apt.staff.id,
+          name: apt.staff.name,
+        } : null,
       })),
     })
   } catch (error) {

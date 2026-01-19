@@ -60,6 +60,8 @@ const scheduleSchema = z.object({
   breakStart: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Giờ nghỉ bắt đầu không hợp lệ').optional().nullable().or(z.literal('')),
   breakEnd: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Giờ nghỉ kết thúc không hợp lệ').optional().nullable().or(z.literal('')),
   date: z.string().optional().nullable(),
+  isAllDay: z.boolean().optional(),
+  hasBreak: z.boolean().optional(),
 }).refine((data) => {
   const [startHour, startMin] = data.startTime.split(':').map(Number)
   const [endHour, endMin] = data.endTime.split(':').map(Number)
@@ -70,7 +72,7 @@ const scheduleSchema = z.object({
   message: 'Giờ kết thúc phải lớn hơn giờ bắt đầu',
   path: ['endTime'],
 }).refine((data) => {
-  if (data.breakStart && data.breakEnd) {
+  if (data.hasBreak && data.breakStart && data.breakEnd) {
     const [breakStartHour, breakStartMin] = data.breakStart.split(':').map(Number)
     const [breakEndHour, breakEndMin] = data.breakEnd.split(':').map(Number)
     const [startHour, startMin] = data.startTime.split(':').map(Number)
@@ -212,7 +214,6 @@ export default function WorkSchedulePage() {
   const handlePrevWeek = () => setCurrentDate(subWeeks(currentDate, 1))
   const handleNextWeek = () => setCurrentDate(addWeeks(currentDate, 1))
   const handleToday = () => setCurrentDate(new Date())
-
   const handleCellClick = (staffId: string, day: Date, currentSchedule?: StaffSchedule) => {
      if (currentSchedule) {
         // Edit existing
@@ -226,6 +227,8 @@ export default function WorkSchedulePage() {
            breakStart: currentSchedule.breakStart || '',
            breakEnd: currentSchedule.breakEnd || '',
            date: currentSchedule.date ? new Date(currentSchedule.date).toISOString().split('T')[0] : '',
+           isAllDay: currentSchedule.startTime === '00:00' && currentSchedule.endTime === '23:59',
+           hasBreak: !!(currentSchedule.breakStart && currentSchedule.breakEnd),
         })
      } else {
         // Create new for this day
@@ -235,14 +238,13 @@ export default function WorkSchedulePage() {
         reset({
            staffId: staffId,
            selectedDays: [dayOfWeek],
-           startTime: '09:00',
-           endTime: '18:00',
+           startTime: '00:00',
+           endTime: '23:59',
            breakStart: '',
            breakEnd: '',
-           date: format(day, 'yyyy-MM-dd'), // Default to specific date logic? Or weekly? 
-           // Treatwell logic: clicking a cell usually implies setting a schedule for that day.
-           // If the user wants recurring, they can uncheck date or select multiple days in modal.
-           // For now, let's pre-fill the specific date to be safe, user can clear it for recurring.
+           date: format(day, 'yyyy-MM-dd'),
+           isAllDay: true, // Default to all day
+           hasBreak: false,
         })
      }
      setShowModal(true)
@@ -251,13 +253,27 @@ export default function WorkSchedulePage() {
   const onSubmit = async (data: ScheduleFormData) => {
     setFormLoading(true)
     setFormError('')
+    
+    // Sanitize data
+    const submissionData = { ...data }
+    
+    // If not using break, clear break times
+    if (!submissionData.hasBreak) {
+       submissionData.breakStart = null
+       submissionData.breakEnd = null
+    }
+    
+    // Remove helper fields
+    delete (submissionData as any).isAllDay
+    delete (submissionData as any).hasBreak
+
     try {
        if (editingSchedule) {
           // Update
           const res = await fetch(`/api/schedules/${editingSchedule.id}`, {
              method: 'PUT',
              headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({ ...data, dayOfWeek: data.selectedDays[0] })
+             body: JSON.stringify({ ...submissionData, dayOfWeek: data.selectedDays[0] })
           })
           if (!res.ok) throw new Error('Failed to update')
        } else {
@@ -266,7 +282,7 @@ export default function WorkSchedulePage() {
              fetch('/api/schedules', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...data, dayOfWeek })
+                body: JSON.stringify({ ...submissionData, dayOfWeek })
              })
           )
           await Promise.all(promises)
@@ -554,7 +570,7 @@ export default function WorkSchedulePage() {
          </div>
       )}
 
-      {/* Modal Logic (Retaining layout but updated) */}
+      {/* Modal Logic */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 m-4">
@@ -587,32 +603,74 @@ export default function WorkSchedulePage() {
                     {watch('selectedDays').length === 0 && <p className="text-red-500 text-xs mt-1">Chọn ít nhất một ngày</p>}
                  </div>
                  
-                 <div className="grid grid-cols-2 gap-4">
-                    <div>
-                       <label className="block text-sm font-medium mb-1">Bắt đầu</label>
-                       <input type="time" {...register('startTime')} className="w-full border rounded-lg px-3 py-2" />
-                       {errors.startTime && <p className="text-red-500 text-xs">{errors.startTime.message}</p>}
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Kết thúc</label>
-                        <input type="time" {...register('endTime')} className="w-full border rounded-lg px-3 py-2" />
-                        {errors.endTime && <p className="text-red-500 text-xs">{errors.endTime.message}</p>}
-                    </div>
+                 {/* All Day Toggle */}
+                 <div className="flex items-center gap-2">
+                    <input 
+                       type="checkbox" 
+                       id="isAllDay"
+                       {...register('isAllDay')}
+                       onChange={(e) => {
+                          register('isAllDay').onChange(e)
+                          if (e.target.checked) {
+                             setValue('startTime', '00:00')
+                             setValue('endTime', '23:59')
+                          }
+                       }}
+                       className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <label htmlFor="isAllDay" className="text-sm font-medium text-gray-700 select-none">Làm cả ngày (09:00 - 19:00)</label>
                  </div>
 
                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                       <label className="block text-sm font-medium mb-1">Nghỉ từ (Tùy chọn)</label>
-                       <input type="time" {...register('breakStart')} className="w-full border rounded-lg px-3 py-2" />
+                       <label className="block text-sm font-medium mb-1">Bắt đầu</label>
+                       <input 
+                           type="time" 
+                           {...register('startTime')} 
+                           disabled={watch('isAllDay')}
+                           className={`w-full border rounded-lg px-3 py-2 ${watch('isAllDay') ? 'bg-gray-100 text-gray-500' : ''}`} 
+                        />
+                       {errors.startTime && <p className="text-red-500 text-xs">{errors.startTime.message}</p>}
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">Đến</label>
-                        <input type="time" {...register('breakEnd')} className="w-full border rounded-lg px-3 py-2" />
+                        <label className="block text-sm font-medium mb-1">Kết thúc</label>
+                        <input 
+                           type="time" 
+                           {...register('endTime')} 
+                           disabled={watch('isAllDay')}
+                           className={`w-full border rounded-lg px-3 py-2 ${watch('isAllDay') ? 'bg-gray-100 text-gray-500' : ''}`} 
+                        />
+                        {errors.endTime && <p className="text-red-500 text-xs">{errors.endTime.message}</p>}
                     </div>
+                 </div>
+
+                 {/* Break Time Toggle */}
+                 <div>
+                    <label className="flex items-center gap-2 mb-2">
+                       <input 
+                          type="checkbox" 
+                          {...register('hasBreak')}
+                          className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                       />
+                       <span className="text-sm font-medium text-gray-700 select-none">Thêm giờ nghỉ</span>
+                    </label>
+
+                    {watch('hasBreak') && (
+                        <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-lg border border-gray-100 animate-in fade-in slide-in-from-top-2 duration-200">
+                           <div>
+                              <label className="block text-xs font-medium mb-1 text-gray-500">Nghỉ từ</label>
+                              <input type="time" {...register('breakStart')} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                           </div>
+                           <div>
+                               <label className="block text-xs font-medium mb-1 text-gray-500">Đến</label>
+                               <input type="time" {...register('breakEnd')} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                           </div>
+                        </div>
+                    )}
                  </div>
                  
                  {/* Date Override */}
-                 <div className="flex items-center gap-2 mt-2">
+                 <div className="flex items-center gap-2 mt-2 pt-2 border-t border-dashed">
                     <input type="date" {...register('date')} className="border rounded-lg px-3 py-2 text-sm" />
                     <span className="text-xs text-gray-500">Chọn ngày cụ thể nếu không muốn lặp lại hàng tuần</span>
                  </div>

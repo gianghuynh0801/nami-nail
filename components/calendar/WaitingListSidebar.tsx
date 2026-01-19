@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Clock, User, GripVertical } from 'lucide-react'
+import { X, Clock, User, GripVertical, Phone } from 'lucide-react'
+import { formatDistanceToNow } from 'date-fns'
+import { vi } from 'date-fns/locale'
 import type { WaitingAppointment, CalendarStaff } from './types'
 
 interface WaitingListSidebarProps {
@@ -107,18 +109,55 @@ export default function WaitingListSidebar({
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 truncate text-sm">
-                    {apt.customerName}
-                  </p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-medium text-gray-900 truncate text-sm">
+                      {apt.customerName}
+                    </p>
+                    {/* Status badge */}
+                    <span className={`
+                      px-1.5 py-0.5 text-[10px] font-medium rounded-full flex-shrink-0
+                      ${apt.status === 'PENDING' 
+                        ? 'bg-yellow-100 text-yellow-700'
+                        : apt.status === 'CONFIRMED'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-teal-100 text-teal-700'}
+                    `}>
+                      {apt.status === 'PENDING' ? 'Chờ xác nhận' : apt.status === 'CONFIRMED' ? 'Đã xác nhận' : 'Đã check-in'}
+                    </span>
+                  </div>
                   <p className="text-xs text-gray-600 truncate">
                     {apt.service.name}
                   </p>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    {/* Thời gian hẹn */}
+                    {apt.startTime && (
+                      <span className="flex items-center gap-1 text-xs text-primary-600 font-medium">
+                        <Clock className="w-3 h-3" />
+                        {new Date(apt.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
                     <span className="flex items-center gap-1 text-xs text-gray-500">
-                      <Clock className="w-3 h-3" />
                       {apt.service.duration} phút
                     </span>
+                    {apt.customerPhone && (
+                      <span className="flex items-center gap-1 text-xs text-gray-500">
+                        <Phone className="w-3 h-3" />
+                        {apt.customerPhone}
+                      </span>
+                    )}
                   </div>
+                  {/* Nhân viên đã gán */}
+                  {apt.assignedStaff && (
+                    <p className="text-[10px] text-blue-600 mt-1">
+                      👤 Gán cho: {apt.assignedStaff.name}
+                    </p>
+                  )}
+                  {/* Thời gian đã đặt */}
+                  {apt.createdAt && (
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      Đặt {formatDistanceToNow(new Date(apt.createdAt), { addSuffix: true, locale: vi })}
+                    </p>
+                  )}
                 </div>
               </div>
 

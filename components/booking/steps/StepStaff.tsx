@@ -10,13 +10,13 @@ interface Staff {
 
 interface StepStaffProps {
   salonId: string
-  serviceId: string
+  serviceIds: string[]
   staff: Staff[]
   selectedStaffId: string
   onSelect: (staffId: string) => void
 }
 
-export default function StepStaff({ salonId, serviceId, staff, selectedStaffId, onSelect }: StepStaffProps) {
+export default function StepStaff({ salonId, serviceIds, staff, selectedStaffId, onSelect }: StepStaffProps) {
   const [availableStaff, setAvailableStaff] = useState<Staff[]>(staff)
   const [loading, setLoading] = useState(false)
 
@@ -24,23 +24,23 @@ export default function StepStaff({ salonId, serviceId, staff, selectedStaffId, 
     // In the future, we can filter staff based on service availability
     // For now, show all staff
     setAvailableStaff(staff)
-  }, [staff, serviceId])
+  }, [staff, serviceIds])
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Select Staff Member</h2>
-        <p className="text-gray-500">Choose your preferred staff member</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Chọn nhân viên</h2>
+        <p className="text-gray-500">Chọn nhân viên bạn muốn phục vụ</p>
       </div>
 
       {loading ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-400 mx-auto"></div>
-          <p className="text-gray-500 mt-4">Loading available staff...</p>
+          <p className="text-gray-500 mt-4">Đang tải danh sách nhân viên...</p>
         </div>
       ) : availableStaff.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-500">No staff members available for this service</p>
+          <p className="text-gray-500">Không có nhân viên nào khả dụng</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

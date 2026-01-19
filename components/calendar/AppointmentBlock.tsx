@@ -70,6 +70,7 @@ export default function AppointmentBlock({
         
         // If mouse moved more than 5px, start dragging
         if (deltaX > 5 || deltaY > 5) {
+          console.log('Block: Drag triggered', appointment.id)
           hasMoved.current = true
           isDraggingMouse.current = true
           if (mouseDownTimer.current) {
@@ -150,29 +151,15 @@ export default function AppointmentBlock({
     }
   }, [isLongPressing])
 
-  if (isDragging) {
-    // Show a ghost/placeholder when dragging
-    return (
-      <div
-        className="absolute left-1 right-1 rounded-lg border-2 border-dashed border-primary-400 bg-primary-100/50"
-        style={{
-          top: `${top}px`,
-          height: `${height}px`,
-          minHeight: '24px',
-        }}
-      />
-    )
-  }
-
   return (
     <div
       ref={blockRef}
       className={`
         absolute left-1 right-1 rounded-lg px-2 py-1 cursor-grab
         transition-all duration-150 select-none overflow-hidden
-        ${colors.bg} ${colors.border} ${colors.text}
-        border-l-4 shadow-sm
-        hover:shadow-md hover:scale-[1.02] hover:z-10
+        ${isDragging ? 'opacity-30 border-dashed border-2 border-primary-400 bg-primary-100 pointer-events-none' : 'pointer-events-auto shadow-sm hover:shadow-md hover:scale-[1.02] hover:z-10'}
+        ${!isDragging && colors.bg} ${!isDragging && colors.border} ${!isDragging && colors.text}
+        ${!isDragging && 'border-l-4'}
         active:cursor-grabbing active:shadow-lg active:scale-105
         ${isLongPressing ? 'scale-105 shadow-lg' : ''}
       `}

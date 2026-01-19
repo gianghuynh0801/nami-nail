@@ -18,7 +18,8 @@ import {
   CalendarDays, 
   X, 
   ChevronRight, 
-  ChevronLeft 
+  ChevronLeft,
+  UserCog
 } from "lucide-react";
 
 
@@ -91,17 +92,18 @@ export default function Sidebar({ isOpen, onClose, isCollapsed = false, onToggle
       icon: <BarChart3 className="w-5 h-5" />,
       href: "/dashboard/statistics",
     },
-    {
-      id: "working-hours",
-      label: "Giờ làm việc",
-      icon: <Clock className="w-5 h-5" />,
-      href: "/dashboard/working-hours",
-    },
+
     {
       id: "work-schedule",
       label: "Lịch làm việc",
       icon: <CalendarDays className="w-5 h-5" />,
       href: "/dashboard/work-schedule",
+    },
+    {
+      id: "staff",
+      label: "Nhân viên",
+      icon: <UserCog className="w-5 h-5" />,
+      href: "/dashboard/staff",
     },
     {
       id: "shift-management",

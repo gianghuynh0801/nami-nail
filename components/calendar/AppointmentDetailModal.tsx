@@ -20,6 +20,7 @@ interface AppointmentDetailModalProps {
   onCancel?: (appointmentId: string) => Promise<void>
   onEdit?: (appointment: CalendarAppointment) => void
   onConfirm?: (appointmentId: string) => Promise<void>
+  onUpdate?: () => void
   isAdmin?: boolean
 }
 
@@ -47,6 +48,7 @@ export default function AppointmentDetailModal({
   onCancel,
   onEdit,
   onConfirm,
+  onUpdate,
   isAdmin = false,
 }: AppointmentDetailModalProps) {
   const [isLoading, setIsLoading] = useState(false)
@@ -226,6 +228,7 @@ export default function AppointmentDetailModal({
       }
 
       setIsEditing(false)
+      if (onUpdate) onUpdate()
       onClose()
     } catch (err: any) {
       console.error('Error saving appointment:', err)

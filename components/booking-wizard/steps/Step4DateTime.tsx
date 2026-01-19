@@ -46,6 +46,10 @@ export default function Step4DateTime({
 
   // Date Editing State
   const [isEditingDate, setIsEditingDate] = useState(false)
+  
+  // Time Editing State - track if time was pre-selected from calendar
+  const [isEditingTime, setIsEditingTime] = useState(false)
+  const [hasPreselectedTime] = useState(() => !!selectedTime) // Check on mount only
 
   // Initialize Date to today if empty
   useEffect(() => {
@@ -250,14 +254,35 @@ export default function Step4DateTime({
       {/* Time Selection */}
       {selectedDate && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <Clock className="w-5 h-5 text-primary-500" />
-            <h3 className="font-semibold text-gray-900">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary-500" />
               Chọn giờ - {format(new Date(selectedDate), 'dd/MM/yyyy')}
             </h3>
+            {hasPreselectedTime && selectedTime && !isEditingTime && (
+              <button 
+                onClick={() => setIsEditingTime(true)}
+                className="text-primary-600 text-sm font-medium hover:underline flex items-center gap-1"
+              >
+                <Edit2 className="w-3 h-3" />
+                Thay đổi
+              </button>
+            )}
           </div>
 
-          {loadingTimes ? (
+          {/* Hiển thị giờ đã chọn nếu có pre-selected time và không đang edit */}
+          {hasPreselectedTime && selectedTime && !isEditingTime ? (
+            <div 
+              className="p-3 bg-primary-50 rounded-lg border border-primary-200 cursor-pointer hover:border-primary-300 transition-colors"
+              onClick={() => setIsEditingTime(true)}
+            >
+              <div className="font-medium text-lg text-primary-700 flex items-center gap-2">
+                <Clock className="w-5 h-5" />
+                {selectedTime}
+              </div>
+              <div className="text-sm text-primary-500 mt-1">Giờ đã chọn từ lịch</div>
+            </div>
+          ) : loadingTimes ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-400 mx-auto" />
               <p className="mt-2 text-sm text-gray-500">Đang tải khung giờ...</p>
@@ -277,7 +302,7 @@ export default function Step4DateTime({
                       className={`
                         px-2 py-2.5 rounded-lg text-sm font-medium transition-all
                         ${!slot.available 
-                           ? 'bg-gray-800 text-gray-400 cursor-not-allowed opacity-80' // "Bôi đen/xám" as requested
+                           ? 'bg-gray-800 text-gray-400 cursor-not-allowed opacity-80'
                            : selectedTime === slot.time && !isCustomTime
                               ? 'bg-primary-500 text-white shadow-md transform scale-105'
                               : 'bg-gray-100 text-gray-700 hover:bg-primary-50 hover:text-primary-600'

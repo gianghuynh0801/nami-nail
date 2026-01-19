@@ -99,9 +99,8 @@ export default function BookingWizardModal({
                   setStaff(staff, false)
                   setDate(dateTime.date)
                   setTime(dateTime.time)
-                  completeDateTime() // Complete date/time step
-                  // Skip to customer info step (step 5)
-                  goToStep(5)
+                  // Bắt đầu từ step 2 (chọn dịch vụ) thay vì skip đến step 5
+                  goToStep(2)
                   return
                 }
               }

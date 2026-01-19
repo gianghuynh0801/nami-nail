@@ -12,11 +12,12 @@ import QueueList from './QueueList'
 import NotificationCenter from './NotificationCenter'
 import CurrentTimeLine from './CurrentTimeLine'
 import AppointmentDetailModal from './AppointmentDetailModal'
-import MiniCalendar from './MiniCalendar'
+
 import { useCalendarData } from './hooks/useCalendarData'
 import { useCalendarDragDrop } from './hooks/useCalendarDragDrop'
 import { useAutoScroll } from './hooks/useAutoScroll'
 import { CALENDAR_CONFIG } from './constants'
+import { checkWorkingHour } from './utils'
 import type { CalendarAppointment, WaitingAppointment } from './types'
 
 interface StaffCalendarViewProps {
@@ -36,7 +37,7 @@ export default function StaffCalendarView({
 }: StaffCalendarViewProps) {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [showWaitingList, setShowWaitingList] = useState(true)
-  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false)
+
   const [selectedAppointment, setSelectedAppointment] = useState<CalendarAppointment | null>(null)
   const [selectedStaffName, setSelectedStaffName] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -64,6 +65,12 @@ export default function StaffCalendarView({
     onMoveAppointment: async (appointmentId, newStaffId, newStartTime) => {
       await moveAppointment(appointmentId, newStaffId, newStartTime)
     },
+    validateDrop: (staffId, time) => {
+      const staffMember = staff.find(s => s.id === staffId)
+      if (!staffMember) return false
+      const [hour, minute] = time.split(':').map(Number)
+      return checkWorkingHour(staffMember, hour, minute) === 'working'
+    }
   })
 
   // Auto-scroll to current time on mount
@@ -292,48 +299,7 @@ export default function StaffCalendarView({
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Mini Calendar */}
-        <div className="hidden lg:flex flex-shrink-0 bg-white border-r border-beige-dark relative transition-all duration-300">
-          {/* Collapsed state - thin bar with toggle button */}
-          {isLeftSidebarCollapsed ? (
-            <div className="w-12 flex flex-col items-center py-4 border-r border-beige-dark">
-              <button
-                onClick={() => setIsLeftSidebarCollapsed(false)}
-                className="p-2 hover:bg-beige-light rounded-lg transition-colors"
-                title="Mở sidebar"
-              >
-                <ChevronRight className="w-5 h-5 text-gray-600" />
-              </button>
-            </div>
-          ) : (
-            <>
-              {/* Expanded state - full sidebar */}
-              <div className="w-64 flex-shrink-0 overflow-y-auto relative">
-                {/* Toggle button - positioned at top right */}
-                <button
-                  onClick={() => setIsLeftSidebarCollapsed(true)}
-                  className="absolute top-2 right-2 z-10 p-1.5 hover:bg-beige-light rounded-lg transition-colors bg-white shadow-sm border border-beige-dark"
-                  title="Thu nhỏ sidebar"
-                >
-                  <ChevronLeft className="w-4 h-4 text-gray-600" />
-                </button>
 
-                <div className="p-4">
-                  <div className="space-y-4">
-                    {/* Mini Calendar */}
-                    <MiniCalendar 
-                      selectedDate={selectedDate}
-                      onDateChange={handleDateChange}
-                    />
-                    
-                    {/* Additional content can be added here */}
-                    {/* For example: Product/Voucher section, Support links, etc. */}
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
 
         {/* Calendar Area */}
         <div className="flex-1 flex flex-col min-w-0">
@@ -370,9 +336,6 @@ export default function StaffCalendarView({
             <div
               ref={scrollContainerRef}
               className="flex-1 overflow-y-auto relative"
-              onMouseMove={dragState.isDragging ? handleDragMove : undefined}
-              onMouseUp={dragState.isDragging ? handleDragEnd : undefined}
-              onMouseLeave={dragState.isDragging ? cancelDrag : undefined}
               onDrop={handleWaitingListDrop}
               onDragOver={(e) => e.preventDefault()}
             >
@@ -420,7 +383,7 @@ export default function StaffCalendarView({
             )}
 
             {/* Waiting List Sidebar (desktop) - for pending appointments */}
-            {showWaitingList && waitingList.length > 0 && (
+            {showWaitingList && (
               <div className="hidden lg:block flex-shrink-0">
                 <WaitingListSidebar
                   appointments={waitingList}
@@ -500,8 +463,31 @@ export default function StaffCalendarView({
         onComplete={handleCompleteAppointment}
         onCancel={handleCancelAppointment}
         onConfirm={handleConfirmAppointment}
+        onUpdate={refetch}
         isAdmin={isAdmin}
       />
+      
+      {/* Drag Overlay */}
+      {dragState.isDragging && dragState.draggedAppointment && (
+        <div 
+          className="fixed z-50 pointer-events-none p-3 bg-white rounded-lg shadow-xl border border-primary-200 opacity-90 w-48 animate-pulse"
+          style={{
+            left: dragState.dragPosition.x,
+            top: dragState.dragPosition.y,
+            transform: 'translate(-50%, -50%)',
+          }}
+        >
+          <p className="font-bold text-sm text-gray-900 truncate">
+            {dragState.draggedAppointment.customerName}
+          </p>
+          <p className="text-xs text-gray-500 truncate">
+            {dragState.draggedAppointment.service.name}
+          </p>
+          <div className="mt-1 flex items-center gap-1 text-xs text-primary-600 font-medium">
+             ⏱️ {dragState.draggedAppointment.service.duration}p
+          </div>
+        </div>
+      )}
     </div>
   )
 }

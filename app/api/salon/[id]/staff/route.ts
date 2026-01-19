@@ -6,6 +6,7 @@ import { z } from 'zod'
 
 const staffSchema = z.object({
   name: z.string().min(1),
+  phone: z.string().optional(),
 })
 
 export async function GET(
@@ -15,21 +16,14 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
     const salon = await prisma.salon.findUnique({
       where: { id: params.id },
     })
 
-    if (!salon || (session.user.role !== 'OWNER' || salon.ownerId !== session.user.id)) {
+    if (!salon) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
+        { error: 'Salon not found' },
+        { status: 404 }
       )
     }
 
@@ -38,7 +32,22 @@ export async function GET(
       orderBy: { createdAt: 'desc' },
     })
 
-    return NextResponse.json({ staff })
+    // Check if user is owner to decide what data to return
+    const isOwner = session?.user?.role === 'OWNER' && salon.ownerId === session.user.id
+
+    if (isOwner) {
+      return NextResponse.json({ staff })
+    }
+
+    // For public/non-owner, return sanitized staff data
+    const sanitizedStaff = staff.map(s => ({
+      id: s.id,
+      name: s.name,
+      salonId: s.salonId,
+      // Exclude phone and other potentially sensitive info
+    }))
+
+    return NextResponse.json({ staff: sanitizedStaff })
   } catch (error) {
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -73,12 +82,12 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { name } = staffSchema.parse(body)
+    const { name, phone } = staffSchema.parse(body)
 
     const staff = await prisma.staff.create({
       data: {
         name,
-        phone: '', // Default to empty string as it is not used in UI but required in DB
+        phone: phone || '', // Default to empty string if not provided
         salonId: params.id,
       },
     })

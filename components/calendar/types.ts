@@ -44,6 +44,13 @@ export interface WaitingAppointment {
   }
   requestedTime?: string
   notes?: string
+  status: 'PENDING' | 'CONFIRMED' | 'CHECKED_IN'
+  createdAt: string  // ISO string
+  startTime: string  // ISO string - thời gian hẹn
+  assignedStaff: {   // Nhân viên đã gán (nếu có)
+    id: string
+    name: string
+  } | null
 }
 
 export interface DragState {

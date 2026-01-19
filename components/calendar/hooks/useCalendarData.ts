@@ -13,10 +13,12 @@ export function useCalendarData(salonId: string, date: Date) {
   const [error, setError] = useState<string | null>(null)
   const { socket } = useSocket()
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (shouldSetLoading = true) => {
     if (!salonId) return
 
-    setIsLoading(true)
+    if (shouldSetLoading) {
+      setIsLoading(true)
+    }
     setError(null)
     
     try {
@@ -42,12 +44,14 @@ export function useCalendarData(salonId: string, date: Date) {
       console.error('Error fetching calendar data:', err)
       setError('Network error. Please try again.')
     } finally {
-      setIsLoading(false)
+      if (shouldSetLoading) {
+        setIsLoading(false)
+      }
     }
   }, [salonId, date])
 
   useEffect(() => {
-    fetchData()
+    fetchData(true)
   }, [fetchData])
 
   // Socket.io realtime updates
@@ -57,7 +61,7 @@ export function useCalendarData(salonId: string, date: Date) {
     socket.emit('join-salon', salonId)
 
     const handleUpdate = () => {
-      fetchData()
+      fetchData(false)
     }
 
     socket.on('appointment-changed', handleUpdate)
@@ -93,7 +97,7 @@ export function useCalendarData(salonId: string, date: Date) {
       if (res.ok) {
         // Emit socket event
         socket?.emit('appointment-moved', { salonId, appointmentId })
-        await fetchData()
+        await fetchData(false) // Silent update
         return true
       } else {
         const errorData = await res.json()
@@ -119,7 +123,7 @@ export function useCalendarData(salonId: string, date: Date) {
     waitingList,
     isLoading,
     error,
-    refetch: fetchData,
+    refetch: () => fetchData(false), // Default to silent refetch
     moveAppointment,
     assignFromWaitingList,
   }

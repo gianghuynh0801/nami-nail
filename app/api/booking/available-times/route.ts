@@ -86,12 +86,14 @@ export async function GET(request: NextRequest) {
           breakEnd: null,
         }
       } else {
-        // No schedule and no salon hours for this day
-        return NextResponse.json({ 
-          times: [],
-          reason: 'NO_SCHEDULE',
-          message: 'Salon không mở cửa vào ngày này'
-        })
+        // Nếu không có salon hours, sử dụng giờ mặc định 09:00 - 18:00
+        // Thay vì trả về lỗi, cho phép đặt lịch với giờ mặc định
+        scheduleTimes = {
+          startTime: '09:00',
+          endTime: '18:00',
+          breakStart: null,
+          breakEnd: null,
+        }
       }
     } else {
       scheduleTimes = {

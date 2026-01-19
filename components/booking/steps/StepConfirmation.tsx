@@ -1,7 +1,8 @@
 'use client'
 
-import { CheckCircle2, Scissors, User, Calendar, MapPin } from 'lucide-react'
+import { CheckCircle2, Scissors, User, Calendar, MapPin, Clock } from 'lucide-react'
 import { format } from 'date-fns'
+import { vi } from 'date-fns/locale'
 
 interface Service {
   id: string
@@ -32,7 +33,7 @@ interface CustomerInfo {
 
 interface StepConfirmationProps {
   salon: Salon
-  service: Service | undefined
+  services: Service[]
   staff: Staff | undefined
   date: string
   time: string
@@ -44,7 +45,7 @@ interface StepConfirmationProps {
 
 export default function StepConfirmation({
   salon,
-  service,
+  services,
   staff,
   date,
   time,
@@ -53,57 +54,70 @@ export default function StepConfirmation({
   loading,
   error,
 }: StepConfirmationProps) {
-  if (!service || !staff || !date || !time) {
+  if (services.length === 0 || !staff || !date || !time) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">Please complete all previous steps</p>
+        <p className="text-gray-500">Vui lòng hoàn thành các bước trước</p>
       </div>
     )
   }
 
   const appointmentDate = new Date(`${date}T${time}`)
+  const totalPrice = services.reduce((sum, s) => sum + s.price, 0)
+  const totalDuration = services.reduce((sum, s) => sum + s.duration, 0)
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Review & Confirm</h2>
-        <p className="text-gray-500">Please review your appointment details before confirming</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Xác nhận đặt lịch</h2>
+        <p className="text-gray-500">Vui lòng kiểm tra lại thông tin trước khi xác nhận</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Left Column: Salon & Service */}
+        {/* Left Column: Salon & Services */}
         <div className="space-y-4">
           {/* Salon Info */}
           <div className="bg-gray-50 rounded-lg p-4">
             <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2 text-sm">
               <MapPin className="w-4 h-4 text-primary-400" />
-              Salon Information
+              Chi nhánh
             </h3>
             <div className="space-y-1 text-xs">
               <p className="text-gray-700">
-                <span className="font-medium">Name:</span> {salon.name}
+                <span className="font-medium">Tên:</span> {salon.name}
               </p>
               <p className="text-gray-700">
-                <span className="font-medium">Address:</span> {salon.address}
+                <span className="font-medium">Địa chỉ:</span> {salon.address}
               </p>
               <p className="text-gray-700">
-                <span className="font-medium">Phone:</span> {salon.phone}
+                <span className="font-medium">SĐT:</span> {salon.phone}
               </p>
             </div>
           </div>
 
-          {/* Service Info */}
+          {/* Services Info */}
           <div className="bg-primary-50 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2 text-sm">
+            <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2 text-sm">
               <Scissors className="w-4 h-4 text-primary-400" />
-              Service
+              Dịch vụ ({services.length})
             </h3>
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-gray-900">{service.name}</p>
-              <p className="text-xs text-gray-600">Duration: {service.duration} min</p>
-              <p className="text-lg font-bold text-primary-400">
-                €{service.price.toLocaleString()}
-              </p>
+            <div className="space-y-2">
+              {services.map((service, index) => (
+                <div key={service.id} className="flex justify-between items-center text-sm border-b border-primary-100 pb-2 last:border-0 last:pb-0">
+                  <div>
+                    <p className="font-medium text-gray-900">{index + 1}. {service.name}</p>
+                    <p className="text-xs text-gray-500">{service.duration} phút</p>
+                  </div>
+                  <p className="font-semibold text-primary-600">€{service.price}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 pt-3 border-t border-primary-200 flex justify-between items-center">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Clock className="w-4 h-4" />
+                <span>{totalDuration} phút</span>
+              </div>
+              <p className="text-lg font-bold text-primary-600">€{totalPrice}</p>
             </div>
           </div>
         </div>
@@ -115,7 +129,7 @@ export default function StepConfirmation({
             <div className="flex items-center justify-between border-b border-gray-200 pb-2">
               <h3 className="font-semibold text-gray-900 flex items-center gap-2 text-sm">
                 <User className="w-4 h-4 text-primary-400" />
-                Staff
+                Nhân viên
               </h3>
               <p className="text-sm font-medium text-gray-900">{staff.name}</p>
             </div>
@@ -124,14 +138,14 @@ export default function StepConfirmation({
             <div className="flex items-center justify-between border-b border-gray-200 pb-2">
               <h3 className="font-semibold text-gray-900 flex items-center gap-2 text-sm">
                 <Calendar className="w-4 h-4 text-primary-400" />
-                Time
+                Thời gian
               </h3>
               <div className="text-right">
                 <p className="text-sm font-semibold text-gray-900">
-                  {format(appointmentDate, 'EEE, MMM dd')}
+                  {format(appointmentDate, 'EEEE, dd/MM/yyyy', { locale: vi })}
                 </p>
                 <p className="text-xs text-gray-600">
-                  {format(appointmentDate, 'HH:mm')}
+                  Lúc {format(appointmentDate, 'HH:mm')}
                 </p>
               </div>
             </div>
@@ -140,11 +154,11 @@ export default function StepConfirmation({
             <div>
               <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2 text-sm">
                 <User className="w-4 h-4 text-primary-400" />
-                Your Info
+                Thông tin khách hàng
               </h3>
               <div className="space-y-1 text-xs text-gray-700">
-                <p><span className="font-medium">Name:</span> {customerInfo.name}</p>
-                <p><span className="font-medium">Phone:</span> {customerInfo.phone}</p>
+                <p><span className="font-medium">Họ tên:</span> {customerInfo.name}</p>
+                <p><span className="font-medium">SĐT:</span> {customerInfo.phone}</p>
                 {customerInfo.email && (
                   <p><span className="font-medium">Email:</span> {customerInfo.email}</p>
                 )}

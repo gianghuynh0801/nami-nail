@@ -61,11 +61,8 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         ...state,
         serviceIds: newServices.map(s => s.id),
         services: newServices,
-        // Reset dependent fields when service changes
-        staffId: null,
-        staff: null,
-        isAnyStaff: false,
-        selectedTime: null,
+        // Giữ lại staff/time nếu đã được set (từ calendar click)
+        // Chỉ reset time nếu chưa có staff (bình thường flow)
         completedSteps: state.completedSteps.filter(s => s < 2),
       }
     

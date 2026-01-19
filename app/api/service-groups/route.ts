@@ -66,7 +66,7 @@ export async function POST(request: Request) {
         description: description || null,
         salonId,
         categoryId: categoryId || null,
-        cleanupTime: cleanupTime || 0,
+        cleanupTime: parseInt(cleanupTime) || 0,
         // Create services
         services: {
           create: services?.map((s: any) => ({

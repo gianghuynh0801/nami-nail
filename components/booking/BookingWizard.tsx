@@ -58,7 +58,7 @@ export default function BookingWizard({ salon: initialSalon, services: initialSe
   const [salon, setSalon] = useState<Salon | null>(initialSalon || null)
   const [services, setServices] = useState<Service[]>(initialServices || [])
   const [staff, setStaff] = useState<Staff[]>(initialStaff || [])
-  const [selectedServiceId, setSelectedServiceId] = useState<string>('')
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
   const [selectedStaffId, setSelectedStaffId] = useState<string>('')
   const [selectedDate, setSelectedDate] = useState<string>('')
   const [selectedTime, setSelectedTime] = useState<string>('')
@@ -98,7 +98,7 @@ export default function BookingWizard({ salon: initialSalon, services: initialSe
       case 'branch':
         return !!selectedSalonId
       case 'service':
-        return !!selectedServiceId
+        return selectedServiceIds.length > 0
       case 'staff':
         return !!selectedStaffId
       case 'datetime':
@@ -169,26 +169,23 @@ export default function BookingWizard({ salon: initialSalon, services: initialSe
         throw new Error('Please select a branch first')
       }
 
-      const selectedService = services.find(s => s.id === selectedServiceId)
-      if (!selectedService) {
-        throw new Error('Service not found')
+      const selectedServices = services.filter(s => selectedServiceIds.includes(s.id))
+      if (selectedServices.length === 0) {
+        throw new Error('Vui lòng chọn ít nhất một dịch vụ')
       }
 
       const startTime = new Date(`${selectedDate}T${selectedTime}`)
-      const endTime = new Date(startTime.getTime() + selectedService.duration * 60000)
 
-      const response = await fetch('/api/appointments', {
+      const response = await fetch('/api/booking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           salonId: salon.id,
           customerName: customerInfo.name,
           customerPhone: customerInfo.phone,
-          customerEmail: customerInfo.email || undefined,
-          serviceId: selectedServiceId,
+          serviceIds: selectedServiceIds,
           staffId: selectedStaffId,
           startTime: startTime.toISOString(),
-          endTime: endTime.toISOString(),
         }),
       })
 
@@ -222,8 +219,14 @@ export default function BookingWizard({ salon: initialSalon, services: initialSe
         return (
           <StepService
             services={services}
-            selectedServiceId={selectedServiceId}
-            onSelect={setSelectedServiceId}
+            selectedServiceIds={selectedServiceIds}
+            onToggle={(serviceId) => {
+              setSelectedServiceIds(prev => 
+                prev.includes(serviceId) 
+                  ? prev.filter(id => id !== serviceId)
+                  : [...prev, serviceId]
+              )
+            }}
           />
         )
       case 'staff':
@@ -237,7 +240,7 @@ export default function BookingWizard({ salon: initialSalon, services: initialSe
         return (
           <StepStaff
             salonId={salon.id}
-            serviceId={selectedServiceId}
+            serviceIds={selectedServiceIds}
             staff={staff}
             selectedStaffId={selectedStaffId}
             onSelect={setSelectedStaffId}
@@ -254,7 +257,7 @@ export default function BookingWizard({ salon: initialSalon, services: initialSe
         return (
           <StepDateTime
             salonId={salon.id}
-            serviceId={selectedServiceId}
+            serviceIds={selectedServiceIds}
             staffId={selectedStaffId}
             selectedDate={selectedDate}
             selectedTime={selectedTime}
@@ -281,7 +284,7 @@ export default function BookingWizard({ salon: initialSalon, services: initialSe
         return (
           <StepConfirmation
             salon={salon}
-            service={services.find(s => s.id === selectedServiceId)}
+            services={services.filter(s => selectedServiceIds.includes(s.id))}
             staff={staff.find(s => s.id === selectedStaffId)}
             date={selectedDate}
             time={selectedTime}
