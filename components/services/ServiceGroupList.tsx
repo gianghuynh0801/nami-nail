@@ -30,6 +30,8 @@ interface ServiceGroupListProps {
   onEdit: (group: ServiceGroup) => void
   onDelete: (groupId: string) => void
   onAddToCategory?: (categoryId: string) => void
+  onEditCategory?: (category: Category) => void
+  onDeleteCategory?: (categoryId: string) => void
 }
 
 // Helper to format duration
@@ -41,7 +43,15 @@ const formatDuration = (minutes: number): string => {
   return `${hours} Tiêu chuẩn. ${mins.toString().padStart(2, '0')} phút`
 }
 
-export default function ServiceGroupList({ groups, categories, onEdit, onDelete, onAddToCategory }: ServiceGroupListProps) {
+export default function ServiceGroupList({ 
+  groups, 
+  categories, 
+  onEdit, 
+  onDelete, 
+  onAddToCategory,
+  onEditCategory,
+  onDeleteCategory 
+}: ServiceGroupListProps) {
   const [expandedGroups, setExpandedGroups] = useState<string[]>([])
 
   const toggleExpand = (id: string) => {
@@ -175,14 +185,34 @@ export default function ServiceGroupList({ groups, categories, onEdit, onDelete,
                 <span className="text-gray-400 text-lg">=</span>
                 <h3 className="font-semibold text-gray-900">{category.name}</h3>
               </div>
-              {onAddToCategory && (
-                <button
-                  onClick={() => onAddToCategory(category.id)}
-                  className="text-sm text-primary-600 hover:text-primary-700 font-medium px-3 py-1 border border-primary-200 rounded-lg hover:bg-primary-50"
-                >
-                  Thêm vào danh mục
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {onEditCategory && (
+                  <button
+                    onClick={() => onEditCategory(category)}
+                    className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                    title="Chỉnh sửa danh mục"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                )}
+                {onDeleteCategory && (
+                  <button
+                    onClick={() => onDeleteCategory(category.id)}
+                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Xóa danh mục"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+                {onAddToCategory && (
+                  <button
+                    onClick={() => onAddToCategory(category.id)}
+                    className="text-sm text-primary-600 hover:text-primary-700 font-medium px-3 py-1 border border-primary-200 rounded-lg hover:bg-primary-50 ml-2"
+                  >
+                    Thêm vào danh mục
+                  </button>
+                )}
+              </div>
             </div>
             
             {/* Services in this category */}

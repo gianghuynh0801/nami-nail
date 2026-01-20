@@ -24,6 +24,7 @@ export default function ServicesPage() {
   const [showServiceModal, setShowServiceModal] = useState(false)
   const [showCategoryModal, setShowCategoryModal] = useState(false)
   const [editingGroup, setEditingGroup] = useState(null)
+  const [editingCategory, setEditingCategory] = useState<ServiceCategory | null>(null)
 
   // Fetch data when salon changes
   useEffect(() => {
@@ -69,6 +70,7 @@ export default function ServicesPage() {
   }
 
   const handleSelectCategory = () => {
+    setEditingCategory(null)
     setShowCategoryModal(true)
   }
 
@@ -80,6 +82,27 @@ export default function ServicesPage() {
   const handleSuccess = () => {
     if (selectedSalonId) {
       fetchData(selectedSalonId)
+    }
+  }
+
+  const handleEditCategory = (category: ServiceCategory) => {
+    setEditingCategory(category)
+    setShowCategoryModal(true)
+  }
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    if (!selectedSalonId) return
+    if (!confirm('Bạn có chắc muốn xóa danh mục này? Tất cả dịch vụ trong danh mục sẽ trở thành chưa phân loại.')) return
+
+    try {
+      const res = await fetch(`/api/salon/${selectedSalonId}/service-category/${categoryId}`, {
+        method: 'DELETE'
+      })
+      if (!res.ok) throw new Error('Failed to delete category')
+      handleSuccess()
+    } catch (error) {
+      console.error('Error deleting category:', error)
+      alert('Lỗi khi xóa danh mục')
     }
   }
 
@@ -148,6 +171,8 @@ export default function ServicesPage() {
             categories={categories}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onEditCategory={handleEditCategory}
+            onDeleteCategory={handleDeleteCategory}
           />
         )}
 
@@ -165,9 +190,13 @@ export default function ServicesPage() {
       {selectedSalonId && (
         <CategoryModal
           isOpen={showCategoryModal}
-          onClose={() => setShowCategoryModal(false)}
+          onClose={() => {
+            setShowCategoryModal(false)
+            setEditingCategory(null)
+          }}
           onSuccess={handleSuccess}
           salonId={selectedSalonId}
+          initialData={editingCategory}
         />
       )}
 
