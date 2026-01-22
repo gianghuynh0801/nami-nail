@@ -136,6 +136,7 @@ export default function ShiftManagementPage() {
   }, [socket, fetchShiftStatus])
 
   const handleStart = async (appointmentId: string) => {
+    if (!selectedSalonId) return
     try {
       const res = await fetch('/api/shift/start', {
         method: 'POST',
@@ -154,7 +155,7 @@ export default function ShiftManagementPage() {
             type: 'started',
           })
         }
-        fetchShiftStatus(selectedSalonId)
+        if (selectedSalonId) fetchShiftStatus(selectedSalonId)
       }
     } catch (error) {
       console.error('Error starting appointment:', error)
@@ -162,6 +163,7 @@ export default function ShiftManagementPage() {
   }
 
   const handleComplete = async (appointmentId: string) => {
+    if (!selectedSalonId) return
     try {
       const res = await fetch('/api/shift/complete', {
         method: 'POST',
@@ -188,6 +190,7 @@ export default function ShiftManagementPage() {
   }
 
   const handleAssign = async (appointmentId: string, staffId: string) => {
+    if (!selectedSalonId) return
     try {
       const res = await fetch('/api/shift/assign', {
         method: 'POST',
@@ -216,7 +219,7 @@ export default function ShiftManagementPage() {
   }
 
   const handlePriorityChange = async (staffId: string, direction: 'up' | 'down') => {
-    if (!shiftData) return
+    if (!shiftData || !selectedSalonId) return
 
     const staff = shiftData.staff.find((s) => s.staff.id === staffId)
     if (!staff || !staff.priority) return
