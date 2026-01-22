@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Search, Plus, Eye, Calendar } from 'lucide-react'
+import { Search, Plus, Eye, Calendar, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { vi } from 'date-fns/locale/vi'
 
@@ -27,10 +27,11 @@ interface Invoice {
     quantity: number
     unitPrice: number
     totalPrice: number
-    service: {
+    customName?: string | null
+    service?: {
       id: string
       name: string
-    }
+    } | null
   }>
 }
 
@@ -41,6 +42,7 @@ export default function InvoicesPage() {
   const [salons, setSalons] = useState<any[]>([])
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
 
   useEffect(() => {
     fetchSalons()
@@ -250,7 +252,10 @@ export default function InvoicesPage() {
                       {format(new Date(invoice.createdAt), 'dd/MM/yyyy HH:mm', { locale: vi })}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button className="text-primary-600 hover:text-primary-900">
+                      <button 
+                        className="text-primary-600 hover:text-primary-900"
+                        onClick={() => setSelectedInvoice(invoice)}
+                      >
                         <Eye className="w-5 h-5" />
                       </button>
                     </td>
@@ -258,6 +263,119 @@ export default function InvoicesPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Detail Modal */}
+      {selectedInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setSelectedInvoice(null)} />
+          <div className="relative w-full max-w-lg bg-white rounded-xl shadow-xl overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-4 bg-gray-50 border-b flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Chi tiết hóa đơn #{selectedInvoice.id.slice(-8)}
+              </h3>
+              <button 
+                onClick={() => setSelectedInvoice(null)}
+                className="p-1 hover:bg-gray-200 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4">
+              {/* Customer Info */}
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Khách hàng:</span>
+                <span className="font-medium">
+                  {selectedInvoice.customer?.name || 'Khách vãng lai'}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Chi nhánh:</span>
+                <span className="font-medium">{selectedInvoice.salon.name}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Ngày tạo:</span>
+                <span className="font-medium">
+                  {format(new Date(selectedInvoice.createdAt), 'dd/MM/yyyy HH:mm', { locale: vi })}
+                </span>
+              </div>
+
+              <hr />
+
+              {/* Items List */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">Dịch vụ:</h4>
+                <div className="space-y-2">
+                  {selectedInvoice.items.map((item, idx) => (
+                    <div 
+                      key={item.id} 
+                      className={`flex justify-between items-center text-sm p-2 rounded ${
+                        item.customName ? 'bg-green-50' : 'bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex-1">
+                        <span className={item.customName ? 'text-green-700' : 'text-gray-900'}>
+                          {item.customName ? `+ ${item.customName}` : item.service?.name || 'Dịch vụ không xác định'}
+                        </span>
+                        {item.quantity > 1 && (
+                          <span className="text-gray-500 text-xs ml-2">x{item.quantity}</span>
+                        )}
+                      </div>
+                      <span className="font-medium">
+                        {item.totalPrice.toLocaleString('vi-VN')}đ
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <hr />
+
+              {/* Totals */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Tổng tiền:</span>
+                  <span>{selectedInvoice.totalAmount.toLocaleString('vi-VN')}đ</span>
+                </div>
+                {selectedInvoice.discount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Giảm giá:</span>
+                    <span className="text-red-500">-{selectedInvoice.discount.toLocaleString('vi-VN')}đ</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-base font-semibold pt-2 border-t">
+                  <span>Thành tiền:</span>
+                  <span className="text-primary-600">{selectedInvoice.finalAmount.toLocaleString('vi-VN')}đ</span>
+                </div>
+              </div>
+
+              {/* Payment */}
+              <div className="flex justify-between items-center pt-2">
+                <span className="text-sm text-gray-500">Thanh toán:</span>
+                <span className="text-sm font-medium">{getPaymentMethodText(selectedInvoice.paymentMethod)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500">Trạng thái:</span>
+                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedInvoice.status)}`}>
+                  {getStatusText(selectedInvoice.status)}
+                </span>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-gray-50 border-t">
+              <button
+                onClick={() => setSelectedInvoice(null)}
+                className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

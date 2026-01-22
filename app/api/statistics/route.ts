@@ -97,17 +97,19 @@ export async function GET(request: Request) {
     })
 
     const topServices = await Promise.all(
-      serviceStats.map(async (stat) => {
-        const service = await prisma.service.findUnique({
-          where: { id: stat.serviceId },
+      serviceStats
+        .filter((stat) => stat.serviceId !== null) // Filter out custom services (null serviceId)
+        .map(async (stat) => {
+          const service = await prisma.service.findUnique({
+            where: { id: stat.serviceId! }, // Non-null assertion after filter
+          })
+          return {
+            service,
+            quantity: stat._sum.quantity || 0,
+            revenue: stat._sum.totalPrice || 0,
+            count: stat._count.id,
+          }
         })
-        return {
-          service,
-          quantity: stat._sum.quantity || 0,
-          revenue: stat._sum.totalPrice || 0,
-          count: stat._count.id,
-        }
-      })
     )
 
     // Staff performance

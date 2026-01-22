@@ -126,12 +126,12 @@ export default function StaffCalendarView({
   }, [staff, onAppointmentClick])
 
   // Handle appointment actions
-  const handleCheckIn = useCallback(async (appointmentId: string, staffId?: string) => {
+  const handleCheckIn = useCallback(async (appointmentId: string) => {
     try {
-      const res = await fetch(`/api/appointments/${appointmentId}/check-in`, {
+      const res = await fetch('/api/shift/checkin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ staffId }),
+        body: JSON.stringify({ appointmentId, salonId }),
       })
       if (!res.ok) {
         const error = await res.json()
@@ -143,7 +143,7 @@ export default function StaffCalendarView({
       console.error('Error checking in appointment:', error)
       throw error
     }
-  }, [refetch])
+  }, [salonId, refetch])
 
   const handleStartAppointment = useCallback(async (appointmentId: string) => {
     try {

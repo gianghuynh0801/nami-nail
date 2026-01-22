@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { Calendar as CalendarIcon, Clock, Plus, Edit, Trash2, X, ChevronLeft, ChevronRight, User } from 'lucide-react'
 import { format, startOfWeek, addDays, subWeeks, addWeeks, isSameDay, parseISO, getDay } from 'date-fns'
 import { vi } from 'date-fns/locale/vi'
+import { useSalonContext } from '@/contexts/SalonContext'
 
 // --- Types ---
 
@@ -96,13 +97,13 @@ type ScheduleFormData = z.infer<typeof scheduleSchema>
 // --- Main Component ---
 
 export default function WorkSchedulePage() {
+  // Use salon from global context (selected in header)
+  const { selectedSalonId, loading: salonLoading } = useSalonContext()
+  
   const [currentDate, setCurrentDate] = useState(new Date())
   const [schedules, setSchedules] = useState<StaffSchedule[]>([])
   const [workingHours, setWorkingHours] = useState<SalonWorkingHours[]>([])
-  const [salons, setSalons] = useState<any[]>([])
   const [staff, setStaff] = useState<Staff[]>([])
-  
-  const [selectedSalonId, setSelectedSalonId] = useState<string>('')
   const [loading, setLoading] = useState(true)
 
   // Modal State
@@ -137,32 +138,12 @@ export default function WorkSchedulePage() {
   // --- Effects ---
 
   useEffect(() => {
-    fetchSalons()
-  }, [])
-
-  useEffect(() => {
     if (selectedSalonId) {
       fetchData()
     }
-  }, [selectedSalonId, currentDate]) // Refetch if date changes (though schedules currently fetch all, optimized fetching by date range is better later)
+  }, [selectedSalonId, currentDate]) // Refetch if date changes or salon changes
 
   // --- Data Fetching ---
-
-  const fetchSalons = async () => {
-    try {
-      const res = await fetch('/api/salon')
-      if (res.ok) {
-        const data = await res.json()
-        const salonsList = data.salons || []
-        setSalons(salonsList)
-        if (salonsList.length > 0 && !selectedSalonId) {
-          setSelectedSalonId(salonsList[0].id)
-        }
-      }
-    } catch (error) {
-       console.error(error)
-    }
-  }
 
   const fetchData = async () => {
     setLoading(true)
@@ -379,7 +360,7 @@ export default function WorkSchedulePage() {
           </div>
        </div>
 
-      {loading ? (
+      {(loading || salonLoading || !selectedSalonId) ? (
         <div className="text-center py-12">Đang tải...</div>
       ) : (
         <div className="bg-white rounded-xl shadow border overflow-hidden">

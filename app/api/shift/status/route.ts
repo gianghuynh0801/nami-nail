@@ -38,7 +38,77 @@ export async function GET(request: Request) {
 
     const now = new Date()
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const yesterdayStart = new Date(todayStart)
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1)
+
+    // ====== DAILY PRIORITY RESET LOGIC ======
+    // Mỗi ngày reset priority 1 lần dựa trên doanh thu ngày hôm trước
+    // Ai làm nhiều hơn ngày hôm trước → ưu tiên thấp hơn (làm sau)
+    const alreadyResetToday = await prisma.shiftDailyReset.findUnique({
+      where: {
+        salonId_resetDate: {
+          salonId,
+          resetDate: todayStart,
+        },
+      },
+    })
+
+    if (!alreadyResetToday) {
+      // Chưa reset hôm nay - thực hiện reset
+      // Lấy tất cả staff và tính doanh thu ngày hôm qua
+      const allStaff = await prisma.staff.findMany({
+        where: { salonId },
+        include: { priority: true },
+      })
+
+      // Tính doanh thu ngày hôm qua cho từng nhân viên
+      const staffYesterdayRevenue = await Promise.all(
+        allStaff.map(async (s) => {
+          const invoices = await prisma.invoice.findMany({
+            where: {
+              salonId,
+              status: 'PAID',
+              createdAt: {
+                gte: yesterdayStart,
+                lt: todayStart,
+              },
+              appointment: {
+                staffId: s.id,
+              },
+            },
+          })
+          const revenue = invoices.reduce((sum, inv) => sum + inv.finalAmount, 0)
+          return { staffId: s.id, revenue, priority: s.priority }
+        })
+      )
+
+      // Sắp xếp theo doanh thu ASC (ai làm ÍT hơn ngày hôm qua → ưu tiên CAO hơn)
+      staffYesterdayRevenue.sort((a, b) => a.revenue - b.revenue)
+
+      // Cập nhật priority order
+      for (let i = 0; i < staffYesterdayRevenue.length; i++) {
+        const item = staffYesterdayRevenue[i]
+        await prisma.staffPriority.upsert({
+          where: { staffId: item.staffId },
+          update: { priorityOrder: i + 1 },
+          create: {
+            staffId: item.staffId,
+            salonId,
+            priorityOrder: i + 1,
+            sortByRevenue: 'ASC',
+          },
+        })
+      }
+
+      // Đánh dấu đã reset hôm nay
+      await prisma.shiftDailyReset.create({
+        data: {
+          salonId,
+          resetDate: todayStart,
+        },
+      })
+    }
+    // ====== END DAILY RESET LOGIC ======
 
     // Auto-start appointments that have reached their start time
     const appointmentsToStart = await prisma.appointment.findMany({
@@ -92,18 +162,19 @@ export async function GET(request: Request) {
       },
     })
 
-    // Get pending appointments (waiting to be assigned)
-    const pending = await prisma.appointment.findMany({
+    // Get checked-in appointments (customers waiting in queue)
+    const waitingQueue = await prisma.appointment.findMany({
       where: {
         salonId,
-        status: 'PENDING',
-        startTime: { gte: todayStart },
+        status: 'CHECKED_IN',
+        checkedInAt: { gte: todayStart },
       },
       include: {
         service: true,
         customer: true,
+        staff: true,
       },
-      orderBy: { startTime: 'asc' },
+      orderBy: { checkedInAt: 'asc' }, // First come, first serve
     })
 
     // Calculate statistics for each staff
@@ -118,19 +189,35 @@ export async function GET(request: Request) {
           },
         })
 
-        // Calculate revenue from beginning of month
-        const invoices = await prisma.invoice.findMany({
+        // Calculate revenue TODAY (not monthly)
+        const invoicesToday = await prisma.invoice.findMany({
           where: {
             salonId,
             status: 'PAID',
-            createdAt: { gte: monthStart },
+            createdAt: { gte: todayStart },
             appointment: {
               staffId: s.id,
             },
           },
         })
+        const revenue = invoicesToday.reduce((sum, inv) => sum + inv.finalAmount, 0)
 
-        const revenue = invoices.reduce((sum, inv) => sum + inv.finalAmount, 0)
+        // Calculate revenue YESTERDAY for comparison
+        const invoicesYesterday = await prisma.invoice.findMany({
+          where: {
+            salonId,
+            status: 'PAID',
+            createdAt: { 
+              gte: yesterdayStart,
+              lt: todayStart 
+            },
+            appointment: {
+              staffId: s.id,
+            },
+          },
+        })
+        const revenueYesterday = invoicesYesterday.reduce((sum, inv) => sum + inv.finalAmount, 0)
+        const revenueDiff = revenue - revenueYesterday
 
         // Calculate working time today (sum of completed appointments duration)
         const completedAppointments = await prisma.appointment.findMany({
@@ -164,6 +251,8 @@ export async function GET(request: Request) {
           stats: {
             completedToday,
             revenue,
+            revenueYesterday,
+            revenueDiff,
             workingMinutes: Math.round(workingMinutes),
           },
         }
@@ -190,7 +279,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       staff: staffStats,
-      pendingAppointments: pending,
+      waitingQueue: waitingQueue, // Khách đã check-in, đang chờ
       inProgressAppointments: inProgress,
     })
   } catch (error) {

@@ -10,6 +10,25 @@ const completeSchema = z.object({
   salonId: z.string(),
 })
 
+// Helper to parse extra services from appointment notes
+interface ExtraService {
+  name: string
+  duration: number
+  price: number
+}
+
+function parseExtraServices(notes: string | null): ExtraService[] {
+  if (!notes) return []
+  const match = notes.match(/\[EXTRA_SERVICES\]([\s\S]*?)\[\/EXTRA_SERVICES\]/)
+  if (!match) return []
+  try {
+    const data = JSON.parse(match[1])
+    return data.items || []
+  } catch {
+    return []
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions)
@@ -69,15 +88,49 @@ export async function POST(request: Request) {
 
     // Create Invoice for the completed appointment
     if (updated.service) {
+      // Parse extra services from notes
+      const extraServices = parseExtraServices(updated.notes)
+      
+      // Calculate totals
+      const mainServicePrice = updated.service.price
+      const extraServicesTotal = extraServices.reduce((sum, e) => sum + (e.price || 0), 0)
+      const totalAmount = mainServicePrice + extraServicesTotal
+      
+      // Prepare invoice items
+      const invoiceItems: { serviceId?: string; customName?: string; quantity: number; unitPrice: number; totalPrice: number }[] = []
+      
+      // Main service item
+      invoiceItems.push({
+        serviceId: updated.service.id,
+        quantity: 1,
+        unitPrice: mainServicePrice,
+        totalPrice: mainServicePrice,
+      })
+      
+      // Extra service items (custom names, no serviceId)
+      extraServices.forEach(extra => {
+        if (extra.name && extra.price > 0) {
+          invoiceItems.push({
+            customName: extra.name,
+            quantity: 1,
+            unitPrice: extra.price,
+            totalPrice: extra.price,
+          })
+        }
+      })
+
       await prisma.invoice.create({
         data: {
           salonId: data.salonId,
           appointmentId: data.appointmentId,
           customerId: updated.customerId,
-          totalAmount: updated.service.price,
-          finalAmount: updated.service.price,
+          totalAmount,
+          finalAmount: totalAmount,
           status: 'PAID',
           paymentMethod: 'CASH', // Default to CASH for auto-generated
+          items: {
+            create: invoiceItems,
+          },
         },
       })
     }

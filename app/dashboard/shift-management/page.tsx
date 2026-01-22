@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSocket } from '@/lib/socket-client'
-import { Maximize2, Minimize2, Bell, Settings } from 'lucide-react'
-import StaffCard from '@/components/dashboard/StaffCard'
+import { useSalonContext } from '@/contexts/SalonContext'
+import { Maximize2, Minimize2, Bell } from 'lucide-react'
+import StaffLeaderboard from '@/components/dashboard/StaffLeaderboard'
 import QueueList from '@/components/dashboard/QueueList'
 
 interface ShiftData {
@@ -24,29 +25,58 @@ interface ShiftData {
     stats: {
       completedToday: number
       revenue: number
+      revenueYesterday: number
+      revenueDiff: number
       workingMinutes: number
     }
   }>
-  pendingAppointments: any[]
+  waitingQueue: any[] // Khách đã check-in, đang chờ
   inProgressAppointments: any[]
 }
 
 export default function ShiftManagementPage() {
   const { socket, isConnected } = useSocket()
+  const { selectedSalonId, selectedSalon, loading: salonLoading } = useSalonContext()
   const [shiftData, setShiftData] = useState<ShiftData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [selectedSalonId, setSelectedSalonId] = useState<string>('')
-  const [salons, setSalons] = useState<any[]>([])
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [notifications, setNotifications] = useState<any[]>([])
-
+  
+  // Ref to track current salonId for use in callbacks/intervals
+  const currentSalonIdRef = useRef<string>('')
+  
+  // Keep ref in sync with context
   useEffect(() => {
-    fetchSalons()
+    currentSalonIdRef.current = selectedSalonId || ''
+  }, [selectedSalonId])
+
+  // Define fetchShiftStatus BEFORE useEffects that use it
+  // Pass salonId as parameter to avoid stale closure issues
+  const fetchShiftStatus = useCallback(async (salonId: string, showLoading = false) => {
+    if (!salonId) return
+
+    // Only show loading on initial load, not on refresh
+    if (showLoading) setLoading(true)
+    
+    try {
+      const res = await fetch(`/api/shift/status?salonId=${salonId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setShiftData(data)
+      }
+    } catch (error) {
+      console.error('Error fetching shift status:', error)
+    } finally {
+      if (showLoading) setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
     if (selectedSalonId) {
-      fetchShiftStatus()
+      // Clear old data first when salon changes
+      setShiftData(null)
+      // Show loading only on initial load or when salon changes
+      fetchShiftStatus(selectedSalonId, true)
       if (socket) {
         socket.emit('join-salon', selectedSalonId)
       }
@@ -57,21 +87,27 @@ export default function ShiftManagementPage() {
         socket.emit('leave-salon', selectedSalonId)
       }
     }
-  }, [selectedSalonId, socket])
+  }, [selectedSalonId, socket, fetchShiftStatus])
 
   useEffect(() => {
     if (!socket) return
 
-    socket.on('appointment-changed', (data) => {
-      fetchShiftStatus()
-    })
+    const handleAppointmentChanged = () => {
+      if (currentSalonIdRef.current) {
+        fetchShiftStatus(currentSalonIdRef.current)
+      }
+    }
 
-    socket.on('priority-changed', (data) => {
-      fetchShiftStatus()
-    })
+    const handlePriorityChanged = () => {
+      if (currentSalonIdRef.current) {
+        fetchShiftStatus(currentSalonIdRef.current)
+      }
+    }
 
-    socket.on('assignment-changed', (data) => {
-      fetchShiftStatus()
+    const handleAssignmentChanged = (data: any) => {
+      if (currentSalonIdRef.current) {
+        fetchShiftStatus(currentSalonIdRef.current)
+      }
       // Show notification for new assignment
       if (data.type === 'new-appointment') {
         setNotifications((prev) => [
@@ -86,46 +122,18 @@ export default function ShiftManagementPage() {
           setNotifications((prev) => prev.slice(1))
         }, 5000)
       }
-    })
+    }
+
+    socket.on('appointment-changed', handleAppointmentChanged)
+    socket.on('priority-changed', handlePriorityChanged)
+    socket.on('assignment-changed', handleAssignmentChanged)
 
     return () => {
-      socket.off('appointment-changed')
-      socket.off('priority-changed')
-      socket.off('assignment-changed')
+      socket.off('appointment-changed', handleAppointmentChanged)
+      socket.off('priority-changed', handlePriorityChanged)
+      socket.off('assignment-changed', handleAssignmentChanged)
     }
-  }, [socket])
-
-  const fetchSalons = async () => {
-    try {
-      const res = await fetch('/api/salon')
-      if (res.ok) {
-        const data = await res.json()
-        setSalons(data.salons || [])
-        if (data.salons && data.salons.length > 0) {
-          setSelectedSalonId(data.salons[0].id)
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching salons:', error)
-    }
-  }
-
-  const fetchShiftStatus = async () => {
-    if (!selectedSalonId) return
-
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/shift/status?salonId=${selectedSalonId}`)
-      if (res.ok) {
-        const data = await res.json()
-        setShiftData(data)
-      }
-    } catch (error) {
-      console.error('Error fetching shift status:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [socket, fetchShiftStatus])
 
   const handleStart = async (appointmentId: string) => {
     try {
@@ -146,7 +154,7 @@ export default function ShiftManagementPage() {
             type: 'started',
           })
         }
-        fetchShiftStatus()
+        fetchShiftStatus(selectedSalonId)
       }
     } catch (error) {
       console.error('Error starting appointment:', error)
@@ -172,7 +180,7 @@ export default function ShiftManagementPage() {
             type: 'completed',
           })
         }
-        fetchShiftStatus()
+        fetchShiftStatus(selectedSalonId)
       }
     } catch (error) {
       console.error('Error completing appointment:', error)
@@ -200,7 +208,7 @@ export default function ShiftManagementPage() {
             type: 'assigned',
           })
         }
-        fetchShiftStatus()
+        fetchShiftStatus(selectedSalonId)
       }
     } catch (error) {
       console.error('Error assigning appointment:', error)
@@ -253,7 +261,7 @@ export default function ShiftManagementPage() {
           staffId,
         })
       }
-      fetchShiftStatus()
+      fetchShiftStatus(selectedSalonId)
     } catch (error) {
       console.error('Error updating priority:', error)
     }
@@ -273,13 +281,40 @@ export default function ShiftManagementPage() {
     if (!selectedSalonId) return
 
     const interval = setInterval(() => {
-      fetchShiftStatus()
+      // Use ref to get current salonId to avoid stale closure
+      if (currentSalonIdRef.current) {
+        fetchShiftStatus(currentSalonIdRef.current) // No loading spinner for auto-refresh
+      }
     }, 5000) // Refresh every 5 seconds
 
     return () => clearInterval(interval)
-  }, [selectedSalonId])
+  }, [selectedSalonId, fetchShiftStatus])
 
-  if (loading) {
+  // Show loading while salon context is loading
+  if (salonLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-400"></div>
+          <p className="mt-4 text-gray-600">Đang tải...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show message if no salon selected
+  if (!selectedSalonId) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-8rem)]">
+        <div className="text-center">
+          <p className="text-gray-500 mb-2">Vui lòng chọn chi nhánh từ menu trên cùng.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Only show full-screen loading on initial load (when no data yet)
+  if (loading && !shiftData) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
@@ -291,42 +326,36 @@ export default function ShiftManagementPage() {
   }
 
   return (
-    <div className={`space-y-4 ${isFullscreen ? 'p-4' : 'p-6'}`}>
-      {/* Header */}
+    <div className={`space-y-3 ${isFullscreen ? 'p-3' : 'p-4'}`}>
+      {/* Header - Compact */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold text-gray-900">Quản lý Chia ca Realtime</h1>
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-bold text-gray-900">Chia ca Realtime</h1>
+          {selectedSalon && (
+            <span className="px-2 py-1 text-xs font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-lg">
+              {selectedSalon.name}
+            </span>
+          )}
+          <div className="flex items-center gap-1.5">
             <div
-              className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}
+              className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}
               title={isConnected ? 'Đã kết nối' : 'Mất kết nối'}
             />
-            <span className="text-sm text-gray-600">
+            <span className="text-xs text-gray-500">
               {isConnected ? 'Đã kết nối' : 'Đang kết nối...'}
             </span>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <select
-            value={selectedSalonId}
-            onChange={(e) => setSelectedSalonId(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-400 focus:border-transparent"
-          >
-            {salons.map((salon) => (
-              <option key={salon.id} value={salon.id}>
-                {salon.name}
-              </option>
-            ))}
-          </select>
           <button
             onClick={toggleFullscreen}
-            className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            className="p-1.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
             title={isFullscreen ? 'Thoát fullscreen' : 'Fullscreen'}
           >
             {isFullscreen ? (
-              <Minimize2 className="w-5 h-5" />
+              <Minimize2 className="w-4 h-4" />
             ) : (
-              <Maximize2 className="w-5 h-5" />
+              <Maximize2 className="w-4 h-4" />
             )}
           </button>
         </div>
@@ -347,67 +376,61 @@ export default function ShiftManagementPage() {
         </div>
       )}
 
-      {/* Main Content - Kanban Board */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* Staff Cards - Kanban Style */}
+      {/* Main Content - Leaderboard Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
+        {/* Staff Leaderboard - Table Style */}
         <div className="lg:col-span-3">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Nhân viên</h2>
-              <p className="text-sm text-gray-500">
-                {shiftData?.staff.length || 0} nhân viên đang làm việc
-              </p>
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h2 className="text-base font-semibold text-gray-900">Bảng xếp hạng nhân viên</h2>
+              <span className="text-xs text-gray-500">
+                {shiftData?.staff.length || 0} người
+              </span>
             </div>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <span className="w-3 h-3 rounded-full bg-green-500"></span>
+            <div className="flex items-center gap-1.5 text-xs text-gray-600">
+              <span className="w-2 h-2 rounded-full bg-green-500"></span>
               <span>Rảnh</span>
-              <span className="w-3 h-3 rounded-full bg-yellow-500 ml-2"></span>
+              <span className="w-2 h-2 rounded-full bg-yellow-500 ml-1.5"></span>
               <span>Có lịch</span>
-              <span className="w-3 h-3 rounded-full bg-blue-500 ml-2"></span>
+              <span className="w-2 h-2 rounded-full bg-blue-500 ml-1.5"></span>
               <span>Đang làm</span>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {shiftData?.staff.map((s) => (
-              <StaffCard
-                key={s.staff.id}
-                staff={s}
-                salonId={selectedSalonId}
-                onStart={handleStart}
-                onComplete={handleComplete}
-                onPriorityChange={handlePriorityChange}
-              />
-            ))}
-          </div>
+          <StaffLeaderboard
+            staffList={shiftData?.staff || []}
+            salonId={selectedSalonId}
+            onStart={handleStart}
+            onComplete={handleComplete}
+            onPriorityChange={handlePriorityChange}
+          />
         </div>
 
         {/* Queue Sidebar */}
-        <div className="lg:col-span-1 space-y-4">
+        <div className="lg:col-span-1 space-y-3">
           <QueueList
-            appointments={shiftData?.pendingAppointments || []}
-            staff={shiftData?.staff.map((s) => s.staff) || []}
-            onAssign={handleAssign}
+            waitingQueue={shiftData?.waitingQueue || []}
+            onStart={handleStart}
           />
           
-          {/* Summary Stats */}
-          <div className="bg-white rounded-lg shadow p-4">
-            <h3 className="font-semibold text-gray-900 mb-3">Tổng quan</h3>
-            <div className="space-y-2">
+          {/* Summary Stats - Compact */}
+          <div className="bg-white rounded-lg shadow p-3">
+            <h3 className="font-semibold text-sm text-gray-900 mb-2">Tổng quan</h3>
+            <div className="space-y-1.5">
               <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Đang làm:</span>
-                <span className="text-sm font-semibold text-blue-600">
+                <span className="text-xs text-gray-600">Đang làm:</span>
+                <span className="text-xs font-semibold text-blue-600">
                   {shiftData?.inProgressAppointments.length || 0}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Chờ gán:</span>
-                <span className="text-sm font-semibold text-yellow-600">
-                  {shiftData?.pendingAppointments.length || 0}
+                <span className="text-xs text-gray-600">Đang chờ:</span>
+                <span className="text-xs font-semibold text-yellow-600">
+                  {shiftData?.waitingQueue.length || 0}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Nhân viên rảnh:</span>
-                <span className="text-sm font-semibold text-green-600">
+                <span className="text-xs text-gray-600">Nhân viên rảnh:</span>
+                <span className="text-xs font-semibold text-green-600">
                   {shiftData?.staff.filter((s) => !s.currentAppointment && s.upcomingAppointments.length === 0).length || 0}
                 </span>
               </div>

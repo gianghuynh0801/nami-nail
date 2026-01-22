@@ -69,15 +69,16 @@ model Salon {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  owner           User                @relation("SalonOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  services        Service[]
-  staff           Staff[]
-  appointments    Appointment[]
-  invoices        Invoice[]
-  workingHours    SalonWorkingHours[]
-  staffPriorities StaffPriority[]
+  owner             User                @relation("SalonOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  services          Service[]
+  staff             Staff[]
+  appointments      Appointment[]
+  invoices          Invoice[]
+  workingHours      SalonWorkingHours[]
+  staffPriorities   StaffPriority[]
   serviceCategories ServiceCategory[]
-  serviceGroups   ServiceGroup[]
+  serviceGroups     ServiceGroup[]
+  shiftDailyResets  ShiftDailyReset[]
 
   @@map("salons")
 }
@@ -244,7 +245,8 @@ model Invoice {
 model InvoiceItem {
   id         String   @id @default(cuid())
   invoiceId  String
-  serviceId  String
+  serviceId  String?  // Optional - null for custom/extra services
+  customName String?  // Name for custom/extra services (when serviceId is null)
   quantity   Int      @default(1)
   unitPrice  Float
   totalPrice Float
@@ -252,7 +254,7 @@ model InvoiceItem {
   updatedAt  DateTime @updatedAt
 
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  service Service? @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
   @@map("invoice_items")
 }
@@ -319,6 +321,19 @@ model ShiftHistory {
   staffPriority StaffPriority @relation(fields: [staffPriorityId], references: [id], onDelete: Cascade)
 
   @@map("shift_history")
+}
+
+// Lưu trữ ngày reset priority cuối cùng cho mỗi salon
+model ShiftDailyReset {
+  id        String   @id @default(cuid())
+  salonId   String
+  resetDate DateTime @db.Date // Ngày reset (không có giờ)
+  createdAt DateTime @default(now())
+
+  salon Salon @relation(fields: [salonId], references: [id], onDelete: Cascade)
+
+  @@unique([salonId, resetDate])
+  @@map("shift_daily_resets")
 }
 
 model ServiceCategory {

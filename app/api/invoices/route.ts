@@ -9,7 +9,8 @@ const invoiceSchema = z.object({
   salonId: z.string(),
   appointmentId: z.string().optional(),
   items: z.array(z.object({
-    serviceId: z.string(),
+    serviceId: z.string().optional(), // Optional for custom/extra services
+    customName: z.string().optional(), // Name for custom services
     quantity: z.number().int().positive(),
     unitPrice: z.number().positive(),
   })),
@@ -138,7 +139,8 @@ export async function POST(request: Request) {
         notes: data.notes,
         items: {
           create: data.items.map(item => ({
-            serviceId: item.serviceId,
+            serviceId: item.serviceId || null, // null for custom services
+            customName: item.customName || null, // Name for custom services
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             totalPrice: item.unitPrice * item.quantity,

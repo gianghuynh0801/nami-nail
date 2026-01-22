@@ -1,10 +1,47 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, User, Phone, Scissors, Clock, Calendar, MapPin, FileText, Play, CheckCircle, XCircle, Edit2, Trash2, Loader2, LogIn, Save, UserCog, Plus, AlertTriangle } from 'lucide-react'
+import { X, User, Phone, Scissors, Clock, Calendar, MapPin, FileText, Play, CheckCircle, XCircle, Edit2, Trash2, Loader2, LogIn, Save, UserCog, Plus, AlertTriangle, DollarSign } from 'lucide-react'
 import { format, parseISO, differenceInMinutes, addMinutes, isBefore, isAfter, areIntervalsOverlapping } from 'date-fns'
 import { vi } from 'date-fns/locale'
 import type { CalendarAppointment } from './types'
+
+// Interface cho dịch vụ thêm thủ công
+interface ExtraService {
+  name: string
+  duration: number // phút
+  price: number // VNĐ
+}
+
+// Helper để parse extra services từ notes
+export function parseExtraServices(notes: string | null | undefined): ExtraService[] {
+  if (!notes) return []
+  const match = notes.match(/\[EXTRA_SERVICES\]([\s\S]*?)\[\/EXTRA_SERVICES\]/)
+  if (!match) return []
+  try {
+    const data = JSON.parse(match[1])
+    return data.items || []
+  } catch {
+    return []
+  }
+}
+
+// Helper để format extra services vào notes
+function formatExtraServicesToNotes(extraServices: ExtraService[], existingNotes: string): string {
+  // Remove old extra services tag if exists
+  let cleanNotes = existingNotes.replace(/\[EXTRA_SERVICES\][\s\S]*?\[\/EXTRA_SERVICES\]\n?/, '').trim()
+  
+  if (extraServices.length === 0) return cleanNotes
+  
+  const extraTag = `[EXTRA_SERVICES]${JSON.stringify({ items: extraServices })}[/EXTRA_SERVICES]`
+  return cleanNotes ? `${cleanNotes}\n${extraTag}` : extraTag
+}
+
+// Helper để hiển thị notes mà không có tag extra services
+export function getDisplayNotes(notes: string | null | undefined): string {
+  if (!notes) return ''
+  return notes.replace(/\[EXTRA_SERVICES\][\s\S]*?\[\/EXTRA_SERVICES\]\n?/, '').trim()
+}
 
 interface AppointmentDetailModalProps {
   salonId?: string
@@ -61,8 +98,8 @@ export default function AppointmentDetailModal({
   const [services, setServices] = useState<any[]>([])
   const [staffListState, setStaffListState] = useState<any[]>([])
   
-  // Extra Services State
-  const [extraServiceIds, setExtraServiceIds] = useState<string[]>([])
+  // Extra Services State (manual input)
+  const [extraServices, setExtraServices] = useState<ExtraService[]>([])
   const [conflictWarning, setConflictWarning] = useState<string | null>(null)
 
   const [editForm, setEditForm] = useState({
@@ -79,7 +116,8 @@ export default function AppointmentDetailModal({
   useEffect(() => {
     if (appointment) {
       setIsEditing(false)
-      setExtraServiceIds([])
+      // Parse existing extra services from notes
+      setExtraServices(parseExtraServices(appointment.notes))
       setConflictWarning(null)
       setEditForm({
         customerName: appointment.customerName,
@@ -88,7 +126,7 @@ export default function AppointmentDetailModal({
         staffId: appointment.staffId,
         startTime: format(parseISO(appointment.startTime), "yyyy-MM-dd'T'HH:mm"),
         endTime: format(parseISO(appointment.endTime), "yyyy-MM-dd'T'HH:mm"),
-        notes: appointment.notes || '',
+        notes: getDisplayNotes(appointment.notes), // Show notes without extra services tag
       })
     }
   }, [appointment, isOpen])
@@ -128,9 +166,9 @@ export default function AppointmentDetailModal({
     const mainSvc = services.find(s => s.id === editForm.serviceId)
     let totalDuration = mainSvc?.duration || 0
 
-    extraServiceIds.forEach(id => {
-      const s = services.find(srv => srv.id === id)
-      if (s) totalDuration += s.duration
+    // Add duration from manual extra services
+    extraServices.forEach(extra => {
+      totalDuration += extra.duration || 0
     })
 
     if (editForm.startTime && totalDuration > 0) {
@@ -148,7 +186,7 @@ export default function AppointmentDetailModal({
         // Invalid date
       }
     }
-  }, [editForm.serviceId, extraServiceIds, editForm.startTime, services])
+  }, [editForm.serviceId, extraServices, editForm.startTime, services, isEditing, editForm.endTime])
 
   // Conflict Detection
   useEffect(() => {
@@ -195,18 +233,9 @@ export default function AppointmentDetailModal({
     setIsLoading(true)
     setActionType('save')
     try {
-      // Append extra services to notes
-      let finalNotes = editForm.notes
-      if (extraServiceIds.length > 0) {
-        const extraNames = extraServiceIds.map(id => services.find(s => s.id === id)?.name).filter(Boolean).join(', ')
-        if (extraNames) {
-          const appendText = `\n[Dịch vụ thêm]: ${extraNames}`
-          // avoid duplicate appending if edit multiple times? 
-          // Simple append for now.
-          if (!finalNotes) finalNotes = `[Dịch vụ thêm]: ${extraNames}`
-          else finalNotes += appendText
-        }
-      }
+      // Format extra services into notes with special tag
+      const validExtras = extraServices.filter(e => e.name.trim())
+      const finalNotes = formatExtraServicesToNotes(validExtras, editForm.notes)
 
       const res = await fetch(`/api/appointments/${appointment!.id}`, {
         method: 'PATCH',
@@ -218,7 +247,7 @@ export default function AppointmentDetailModal({
           staffId: editForm.staffId,
           startTime: new Date(editForm.startTime).toISOString(),
           endTime: new Date(editForm.endTime).toISOString(),
-          notes: finalNotes !== appointment?.notes ? finalNotes : undefined,
+          notes: finalNotes,
         }),
       })
 
@@ -329,6 +358,7 @@ export default function AppointmentDetailModal({
                 <p className="text-sm text-gray-500">Dịch vụ</p>
                 {isEditing ? (
                   <>
+                    {/* Main Service */}
                     <select
                       className="w-full px-2 py-1 border rounded"
                       value={editForm.serviceId}
@@ -336,56 +366,120 @@ export default function AppointmentDetailModal({
                       disabled={loadingData}
                     >
                       {services.map(s => (
-                        <option key={s.id} value={s.id}>{s.name} ({s.duration}p)</option>
+                        <option key={s.id} value={s.id}>{s.name} ({s.duration}p) - {s.price?.toLocaleString('vi-VN')}đ</option>
                       ))}
                     </select>
                     
-                    {/* Extra Services List */}
-                    {extraServiceIds.map((extraId, index) => {
-                       const s = services.find(srv => srv.id === extraId)
-                       return (
-                         <div key={index} className="flex gap-2 items-center">
-                            <select 
-                              className="flex-1 px-2 py-1 border rounded text-sm bg-gray-50"
-                              value={extraId}
-                              onChange={(e) => {
-                                 const newIds = [...extraServiceIds]
-                                 newIds[index] = e.target.value
-                                 setExtraServiceIds(newIds)
-                              }}
-                            >
-                               {services.map(s => (
-                                 <option key={s.id} value={s.id}>+ {s.name} ({s.duration}p)</option>
-                               ))}
-                            </select>
-                            <button 
-                              onClick={() => {
-                                const newIds = extraServiceIds.filter((_, i) => i !== index)
-                                setExtraServiceIds(newIds)
-                              }}
-                              className="p-1 text-red-500 hover:bg-red-50 rounded"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                         </div>
-                       )
-                    })}
+                    {/* Extra Services List - Manual Input */}
+                    {extraServices.length > 0 && (
+                      <div className="mt-2 space-y-2">
+                        <p className="text-xs text-gray-500 font-medium">Dịch vụ thêm:</p>
+                        {extraServices.map((extra, index) => (
+                          <div key={index} className="p-2 bg-green-50 border border-green-200 rounded-lg space-y-2">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                placeholder="Tên dịch vụ (VD: Vẽ nail)"
+                                className="flex-1 px-2 py-1 border rounded text-sm"
+                                value={extra.name}
+                                onChange={(e) => {
+                                  const newExtras = [...extraServices]
+                                  newExtras[index] = { ...newExtras[index], name: e.target.value }
+                                  setExtraServices(newExtras)
+                                }}
+                              />
+                              <button 
+                                onClick={() => {
+                                  const newExtras = extraServices.filter((_, i) => i !== index)
+                                  setExtraServices(newExtras)
+                                }}
+                                className="p-1 text-red-500 hover:bg-red-100 rounded"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                            <div className="flex gap-2">
+                              <div className="flex-1">
+                                <label className="text-[10px] text-gray-500">Thời gian (phút)</label>
+                                <input
+                                  type="number"
+                                  placeholder="15"
+                                  min="0"
+                                  className="w-full px-2 py-1 border rounded text-sm"
+                                  value={extra.duration || ''}
+                                  onChange={(e) => {
+                                    const newExtras = [...extraServices]
+                                    newExtras[index] = { ...newExtras[index], duration: parseInt(e.target.value) || 0 }
+                                    setExtraServices(newExtras)
+                                  }}
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <label className="text-[10px] text-gray-500">Giá (VNĐ)</label>
+                                <input
+                                  type="number"
+                                  placeholder="50000"
+                                  min="0"
+                                  step="1000"
+                                  className="w-full px-2 py-1 border rounded text-sm"
+                                  value={extra.price || ''}
+                                  onChange={(e) => {
+                                    const newExtras = [...extraServices]
+                                    newExtras[index] = { ...newExtras[index], price: parseInt(e.target.value) || 0 }
+                                    setExtraServices(newExtras)
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     
                     {/* Add Service Button */}
                     <button
                       type="button"
                       onClick={() => {
-                        if (services.length > 0) {
-                           setExtraServiceIds([...extraServiceIds, services[0].id])
-                        }
+                        setExtraServices([...extraServices, { name: '', duration: 0, price: 0 }])
                       }}
-                      className="text-xs flex items-center gap-1 text-primary-600 hover:underline font-medium"
+                      className="text-xs flex items-center gap-1 text-primary-600 hover:underline font-medium mt-2"
                     >
                       <Plus className="w-3 h-3" /> Thêm dịch vụ
                     </button>
+
+                    {/* Total Summary */}
+                    {extraServices.length > 0 && (
+                      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                        <div className="flex justify-between text-gray-600">
+                          <span>Tổng thời gian:</span>
+                          <span className="font-medium">
+                            {(services.find(s => s.id === editForm.serviceId)?.duration || 0) + extraServices.reduce((sum, e) => sum + (e.duration || 0), 0)} phút
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-gray-600 mt-1">
+                          <span>Tổng giá (dự kiến):</span>
+                          <span className="font-semibold text-primary-600">
+                            {((services.find(s => s.id === editForm.serviceId)?.price || 0) + extraServices.reduce((sum, e) => sum + (e.price || 0), 0)).toLocaleString('vi-VN')}đ
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </>
                 ) : (
-                  <p className="font-medium text-gray-900">{appointment.service.name} <span className="text-sm font-normal text-gray-500">({appointment.service.duration} phút)</span></p>
+                  <>
+                    <p className="font-medium text-gray-900">{appointment.service.name} <span className="text-sm font-normal text-gray-500">({appointment.service.duration} phút)</span></p>
+                    {/* Show extra services in view mode */}
+                    {parseExtraServices(appointment.notes).length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {parseExtraServices(appointment.notes).map((extra, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-sm bg-green-50 px-2 py-1 rounded">
+                            <span className="text-green-700">+ {extra.name} ({extra.duration}p)</span>
+                            <span className="font-medium text-green-600">{extra.price.toLocaleString('vi-VN')}đ</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -452,9 +546,9 @@ export default function AppointmentDetailModal({
                <div className="flex-1">
                  <p className="text-sm text-gray-500">Ghi chú</p>
                  {isEditing ? (
-                    <textarea className="w-full mt-1 px-2 py-1 border rounded" rows={3} value={editForm.notes} onChange={e => setEditForm(prev => ({ ...prev, notes: e.target.value }))} />
+                    <textarea className="w-full mt-1 px-2 py-1 border rounded" rows={3} placeholder="Ghi chú thêm..." value={editForm.notes} onChange={e => setEditForm(prev => ({ ...prev, notes: e.target.value }))} />
                  ) : (
-                    <p className="text-gray-700 whitespace-pre-wrap">{appointment.notes || 'Không có ghi chú'}</p>
+                    <p className="text-gray-700 whitespace-pre-wrap">{getDisplayNotes(appointment.notes) || 'Không có ghi chú'}</p>
                  )}
                </div>
             </div>
