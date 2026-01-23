@@ -66,6 +66,7 @@ const scheduleSchema = z.object({
   dateRangeEnd: z.string().optional().nullable(), // Chỉ dùng khi mode = 'range'
   isAllDay: z.boolean().optional(),
   hasBreak: z.boolean().optional(),
+  isOffDay: z.boolean().optional(), // Đánh dấu nghỉ (override lịch hàng tuần)
 }).refine((data) => {
   // Validate based on mode
   if (data.scheduleMode === 'weekly' && (!data.selectedDays || data.selectedDays.length === 0)) {
@@ -89,6 +90,9 @@ const scheduleSchema = z.object({
   message: 'Vui lòng điền đầy đủ thông tin ngày áp dụng',
   path: ['scheduleMode'],
 }).refine((data) => {
+  // Nếu là ngày nghỉ, cho phép startTime = endTime
+  if (data.isOffDay) return true
+  
   const [startHour, startMin] = data.startTime.split(':').map(Number)
   const [endHour, endMin] = data.endTime.split(':').map(Number)
   const start = startHour * 60 + startMin
@@ -155,6 +159,7 @@ export default function WorkSchedulePage() {
     defaultValues: { 
       selectedDays: [],
       scheduleMode: 'weekly',
+      isOffDay: false,
     },
   })
 
@@ -229,19 +234,21 @@ export default function WorkSchedulePage() {
         setEditingSchedule(currentSchedule)
         setSelectedDaysInModal([currentSchedule.dayOfWeek])
         const hasDate = !!currentSchedule.date
+        const isOffDay = currentSchedule.startTime === '00:00' && currentSchedule.endTime === '00:00'
         reset({
            staffId: staffId,
            scheduleMode: hasDate ? 'single' : 'weekly',
            selectedDays: hasDate ? [] : [currentSchedule.dayOfWeek],
-           startTime: currentSchedule.startTime,
-           endTime: currentSchedule.endTime,
+           startTime: isOffDay ? '00:00' : currentSchedule.startTime,
+           endTime: isOffDay ? '00:00' : currentSchedule.endTime,
            breakStart: currentSchedule.breakStart || '',
            breakEnd: currentSchedule.breakEnd || '',
            date: currentSchedule.date ? new Date(currentSchedule.date).toISOString().split('T')[0] : '',
            dateRangeStart: '',
            dateRangeEnd: '',
-           isAllDay: currentSchedule.startTime === '00:00' && currentSchedule.endTime === '23:59',
+           isAllDay: currentSchedule.startTime === '00:00' && currentSchedule.endTime === '23:59' && !isOffDay,
            hasBreak: !!(currentSchedule.breakStart && currentSchedule.breakEnd),
+           isOffDay: isOffDay,
         })
      } else {
         // Create new for this day
@@ -261,6 +268,7 @@ export default function WorkSchedulePage() {
            dateRangeEnd: '',
            isAllDay: true, // Default to all day
            hasBreak: false,
+           isOffDay: false,
         })
      }
      setShowModal(true)
@@ -273,10 +281,11 @@ export default function WorkSchedulePage() {
     // Sanitize data
     const submissionData: any = {
       staffId: data.staffId,
-      startTime: data.startTime,
-      endTime: data.endTime,
-      breakStart: data.hasBreak ? (data.breakStart || null) : null,
-      breakEnd: data.hasBreak ? (data.breakEnd || null) : null,
+      // Nếu là ngày nghỉ, set startTime = endTime = "00:00" để đánh dấu nghỉ
+      startTime: data.isOffDay ? '00:00' : data.startTime,
+      endTime: data.isOffDay ? '00:00' : data.endTime,
+      breakStart: data.isOffDay ? null : (data.hasBreak ? (data.breakStart || null) : null),
+      breakEnd: data.isOffDay ? null : (data.hasBreak ? (data.breakEnd || null) : null),
     }
 
     try {
@@ -518,9 +527,15 @@ export default function WorkSchedulePage() {
                              >
                                 {schedule ? (
                                    <div className="inline-flex flex-col items-center">
-                                      <span className="font-medium text-sm">{schedule.startTime} - {schedule.endTime}</span>
-                                      {schedule.breakStart && (
-                                         <span className="text-xs text-gray-400 mt-1">Nghỉ: {schedule.breakStart}-{schedule.breakEnd}</span>
+                                      {schedule.startTime === '00:00' && schedule.endTime === '00:00' ? (
+                                         <span className="font-medium text-sm text-red-600">Nghỉ</span>
+                                      ) : (
+                                         <>
+                                            <span className="font-medium text-sm">{schedule.startTime} - {schedule.endTime}</span>
+                                            {schedule.breakStart && (
+                                               <span className="text-xs text-gray-400 mt-1">Nghỉ: {schedule.breakStart}-{schedule.breakEnd}</span>
+                                            )}
+                                         </>
                                       )}
                                       {!schedule.date && <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-blue-400" title="Lịch lặp lại hàng tuần"></span>}
                                    </div>
@@ -734,71 +749,108 @@ export default function WorkSchedulePage() {
                     </div>
                  )}
                  
-                 {/* All Day Toggle */}
-                 <div className="flex items-center gap-2">
-                    <input 
-                       type="checkbox" 
-                       id="isAllDay"
-                       {...register('isAllDay')}
-                       onChange={(e) => {
-                          register('isAllDay').onChange(e)
-                          if (e.target.checked) {
-                             setValue('startTime', '00:00')
-                             setValue('endTime', '23:59')
-                          }
-                       }}
-                       className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <label htmlFor="isAllDay" className="text-sm font-medium text-gray-700 select-none">Làm cả ngày (09:00 - 19:00)</label>
-                 </div>
-
-                 <div className="grid grid-cols-2 gap-4">
-                    <div>
-                       <label className="block text-sm font-medium mb-1">Bắt đầu</label>
-                       <input 
-                           type="time" 
-                           {...register('startTime')} 
-                           disabled={watch('isAllDay')}
-                           className={`w-full border rounded-lg px-3 py-2 ${watch('isAllDay') ? 'bg-gray-100 text-gray-500' : ''}`} 
-                        />
-                       {errors.startTime && <p className="text-red-500 text-xs">{errors.startTime.message}</p>}
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Kết thúc</label>
-                        <input 
-                           type="time" 
-                           {...register('endTime')} 
-                           disabled={watch('isAllDay')}
-                           className={`w-full border rounded-lg px-3 py-2 ${watch('isAllDay') ? 'bg-gray-100 text-gray-500' : ''}`} 
-                        />
-                        {errors.endTime && <p className="text-red-500 text-xs">{errors.endTime.message}</p>}
-                    </div>
-                 </div>
-
-                 {/* Break Time Toggle */}
-                 <div>
-                    <label className="flex items-center gap-2 mb-2">
+                 {/* Off Day Toggle - Only show for single or range mode (to override weekly schedule) */}
+                 {(watch('scheduleMode') === 'single' || watch('scheduleMode') === 'range') && (
+                    <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                        <input 
                           type="checkbox" 
-                          {...register('hasBreak')}
+                          id="isOffDay"
+                          {...register('isOffDay')}
+                          onChange={(e) => {
+                             register('isOffDay').onChange(e)
+                             if (e.target.checked) {
+                                setValue('startTime', '00:00')
+                                setValue('endTime', '00:00')
+                                setValue('hasBreak', false)
+                                setValue('breakStart', '')
+                                setValue('breakEnd', '')
+                             } else {
+                                setValue('startTime', '00:00')
+                                setValue('endTime', '23:59')
+                                setValue('isAllDay', true)
+                             }
+                          }}
                           className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                        />
-                       <span className="text-sm font-medium text-gray-700 select-none">Thêm giờ nghỉ</span>
-                    </label>
+                       <label htmlFor="isOffDay" className="text-sm font-medium text-gray-700 select-none cursor-pointer">
+                          <span className="text-yellow-700 font-semibold">Đánh dấu nghỉ</span>
+                          <span className="text-xs text-gray-500 block mt-0.5">(Ghi đè lịch hàng tuần cho ngày này)</span>
+                       </label>
+                    </div>
+                 )}
 
-                    {watch('hasBreak') && (
-                        <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-lg border border-gray-100 animate-in fade-in slide-in-from-top-2 duration-200">
-                           <div>
-                              <label className="block text-xs font-medium mb-1 text-gray-500">Nghỉ từ</label>
-                              <input type="time" {...register('breakStart')} className="w-full border rounded-lg px-3 py-2 text-sm" />
-                           </div>
-                           <div>
-                               <label className="block text-xs font-medium mb-1 text-gray-500">Đến</label>
-                               <input type="time" {...register('breakEnd')} className="w-full border rounded-lg px-3 py-2 text-sm" />
-                           </div>
-                        </div>
-                    )}
-                 </div>
+                 {/* All Day Toggle - Only show when not off day */}
+                 {!watch('isOffDay') && (
+                    <div className="flex items-center gap-2">
+                       <input 
+                          type="checkbox" 
+                          id="isAllDay"
+                          {...register('isAllDay')}
+                          onChange={(e) => {
+                             register('isAllDay').onChange(e)
+                             if (e.target.checked) {
+                                setValue('startTime', '00:00')
+                                setValue('endTime', '23:59')
+                             }
+                          }}
+                          className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                       />
+                       <label htmlFor="isAllDay" className="text-sm font-medium text-gray-700 select-none">Làm cả ngày (09:00 - 19:00)</label>
+                    </div>
+                 )}
+
+                 {/* Time inputs - Hide when off day */}
+                 {!watch('isOffDay') && (
+                    <div className="grid grid-cols-2 gap-4">
+                       <div>
+                          <label className="block text-sm font-medium mb-1">Bắt đầu</label>
+                          <input 
+                              type="time" 
+                              {...register('startTime')} 
+                              disabled={watch('isAllDay')}
+                              className={`w-full border rounded-lg px-3 py-2 ${watch('isAllDay') ? 'bg-gray-100 text-gray-500' : ''}`} 
+                           />
+                          {errors.startTime && <p className="text-red-500 text-xs">{errors.startTime.message}</p>}
+                       </div>
+                       <div>
+                           <label className="block text-sm font-medium mb-1">Kết thúc</label>
+                           <input 
+                              type="time" 
+                              {...register('endTime')} 
+                              disabled={watch('isAllDay')}
+                              className={`w-full border rounded-lg px-3 py-2 ${watch('isAllDay') ? 'bg-gray-100 text-gray-500' : ''}`} 
+                           />
+                           {errors.endTime && <p className="text-red-500 text-xs">{errors.endTime.message}</p>}
+                       </div>
+                    </div>
+                 )}
+
+                 {/* Break Time Toggle - Only show when not off day */}
+                 {!watch('isOffDay') && (
+                    <div>
+                       <label className="flex items-center gap-2 mb-2">
+                          <input 
+                             type="checkbox" 
+                             {...register('hasBreak')}
+                             className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                          />
+                          <span className="text-sm font-medium text-gray-700 select-none">Thêm giờ nghỉ</span>
+                       </label>
+
+                       {watch('hasBreak') && (
+                          <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-lg border border-gray-100 animate-in fade-in slide-in-from-top-2 duration-200">
+                             <div>
+                                <label className="block text-xs font-medium mb-1 text-gray-500">Nghỉ từ</label>
+                                <input type="time" {...register('breakStart')} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                             </div>
+                             <div>
+                                 <label className="block text-xs font-medium mb-1 text-gray-500">Đến</label>
+                                 <input type="time" {...register('breakEnd')} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                             </div>
+                          </div>
+                       )}
+                    </div>
+                 )}
 
                  <div className="flex gap-3 mt-6 pt-4 border-t">
                     {editingSchedule && (
