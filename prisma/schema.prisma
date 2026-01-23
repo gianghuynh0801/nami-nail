@@ -65,6 +65,7 @@ model Salon {
   slug      String   @unique
   address   String
   phone     String
+  timezone  String   @default("Asia/Ho_Chi_Minh") // IANA timezone, used for booking/calendar display
   ownerId   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

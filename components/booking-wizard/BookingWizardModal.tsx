@@ -12,6 +12,7 @@ import Step4DateTime from './steps/Step4DateTime'
 import Step5CustomerInfo from './steps/Step5CustomerInfo'
 import Step6Review from './steps/Step6Review'
 import Step7Success from './steps/Step7Success'
+import { salonLocalToUtcISOString } from '@/lib/timezone'
 
 interface BookingWizardModalProps {
   isOpen: boolean
@@ -158,7 +159,8 @@ export default function BookingWizardModal({
           customerEmail: state.customerInfo.email || undefined,
           serviceIds: state.serviceIds, // Send array of IDs
           staffId: staffIdToUse,
-          startTime: `${state.selectedDate}T${state.selectedTime}:00`,
+          // Convert salon-local date/time to UTC ISO (avoid client timezone differences)
+          startTime: salonLocalToUtcISOString(state.selectedDate, state.selectedTime, state.salon?.timezone),
           notes: state.customerInfo.notes || undefined,
         }),
       })
@@ -256,6 +258,7 @@ export default function BookingWizardModal({
         return (
           <Step4DateTime
             salonId={state.salonId!}
+            salonTimezone={state.salon?.timezone}
             staffId={state.staffId}
             serviceIds={state.serviceIds}
             isAnyStaff={state.isAnyStaff}

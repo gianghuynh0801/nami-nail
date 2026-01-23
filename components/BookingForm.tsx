@@ -8,6 +8,8 @@ import { z } from 'zod'
 import { addMinutes } from 'date-fns'
 import { format } from 'date-fns'
 import { User, Phone, Scissors, Users, Calendar, Clock, CheckCircle2 } from 'lucide-react'
+import { salonLocalToUtcISOString } from '@/lib/timezone'
+import { salonTodayISO, salonDateLabel } from '@/lib/timezone'
 
 interface Service {
   id: string
@@ -26,6 +28,7 @@ interface Salon {
   id: string
   name: string
   slug: string
+  timezone?: string
 }
 
 interface BookingFormProps {
@@ -155,7 +158,9 @@ export default function BookingForm({ salon, services, staff }: BookingFormProps
     }
 
     try {
-      const startTime = new Date(`${data.date}T${data.time}`)
+      // Convert salon-local date/time to UTC ISO to avoid client timezone differences
+      const startTimeISO = salonLocalToUtcISOString(data.date, data.time, (salon as any)?.timezone)
+      const startTime = new Date(startTimeISO)
       const endTime = addMinutes(startTime, selectedService.duration)
 
 
@@ -169,7 +174,7 @@ export default function BookingForm({ salon, services, staff }: BookingFormProps
           customerEmail: data.customerEmail || undefined,
           serviceId: data.serviceId,
           staffId: data.staffId,
-          startTime: startTime.toISOString(),
+          startTime: startTimeISO,
         }),
       })
 
@@ -191,7 +196,7 @@ export default function BookingForm({ salon, services, staff }: BookingFormProps
   }
 
   // Get minimum date (today)
-  const today = format(new Date(), 'yyyy-MM-dd')
+  const today = salonTodayISO(salon.timezone)
 
   if (success) {
     return (

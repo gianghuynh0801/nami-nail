@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { Calendar, Clock } from 'lucide-react'
-import { format, parseISO, isValid } from 'date-fns'
+import { parseISO, isValid } from 'date-fns'
 import { vi } from 'date-fns/locale'
+import { salonDateLabel, salonTodayISO } from '@/lib/timezone'
 
 interface TimeSlot {
   time: string
@@ -15,6 +16,7 @@ interface StepDateTimeProps {
   salonId: string
   serviceIds: string[]
   staffId: string
+  salonTimezone?: string
   selectedDate: string
   selectedTime: string
   onSelectDate: (date: string) => void
@@ -25,6 +27,7 @@ export default function StepDateTime({
   salonId,
   serviceIds,
   staffId,
+  salonTimezone,
   selectedDate,
   selectedTime,
   onSelectDate,
@@ -34,7 +37,8 @@ export default function StepDateTime({
   const [loading, setLoading] = useState(false)
   const [customTime, setCustomTime] = useState('')
   const [isCustomTime, setIsCustomTime] = useState(false)
-  const today = format(new Date(), 'yyyy-MM-dd')
+  // Today based on salon timezone (avoid client timezone differences)
+  const today = salonTodayISO(salonTimezone)
 
   useEffect(() => {
     if (selectedDate && serviceIds.length > 0 && staffId) {
@@ -125,7 +129,7 @@ export default function StepDateTime({
           />
           {selectedDate && isValid(parseISO(selectedDate)) && (
             <p className="mt-2 text-sm text-gray-600 capitalize">
-              {format(parseISO(selectedDate), 'EEEE, dd/MM/yyyy', { locale: vi })}
+              {salonDateLabel(selectedDate, salonTimezone, 'EEEE, dd/MM/yyyy')}
             </p>
           )}
         </div>

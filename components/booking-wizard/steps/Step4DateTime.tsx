@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { Calendar as CalendarIcon, Clock, ChevronRight, ChevronLeft, Edit2, RotateCcw } from 'lucide-react'
-import { format, isBefore, startOfDay, parseISO, isValid } from 'date-fns'
+import { parseISO, isValid } from 'date-fns'
 import { vi } from 'date-fns/locale'
+import { salonDateLabel, salonTodayISO } from '@/lib/timezone'
 
 interface Step4DateTimeProps {
   salonId: string
+  salonTimezone?: string
   staffId: string | null
   serviceIds: string[]
   isAnyStaff: boolean
@@ -26,6 +28,7 @@ interface TimeSlot {
 
 export default function Step4DateTime({
   salonId,
+  salonTimezone,
   staffId,
   serviceIds,
   isAnyStaff,
@@ -54,7 +57,7 @@ export default function Step4DateTime({
   // Initialize Date to today if empty
   useEffect(() => {
     if (!selectedDate) {
-      onSelectDate(format(new Date(), 'yyyy-MM-dd'))
+      onSelectDate(salonTodayISO(salonTimezone))
     }
   }, []) // Run once
 
@@ -224,7 +227,7 @@ export default function Step4DateTime({
                <input 
                   type="date" 
                   value={selectedDate || ''}
-                  min={format(new Date(), 'yyyy-MM-dd')}
+                  min={salonTodayISO(salonTimezone)}
                   onChange={handleDateChange}
                   className="flex-1 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 outline-none"
                   autoFocus
@@ -242,11 +245,9 @@ export default function Step4DateTime({
                onClick={() => setIsEditingDate(true)}
             >
                <div className="font-medium text-lg text-gray-900 capitalize">
-                  {selectedDate ? format(parseISO(selectedDate), 'EEEE, dd/MM/yyyy', { locale: vi }) : 'Chọn ngày'}
+                  {selectedDate ? salonDateLabel(selectedDate, salonTimezone, 'EEEE, dd/MM/yyyy') : 'Chọn ngày'}
                </div>
-               {selectedDate && isValid(parseISO(selectedDate)) && isBefore(startOfDay(parseISO(selectedDate)), startOfDay(new Date())) && (
-                  <div className="text-red-500 text-sm mt-1">Ngày đã qua</div>
-               )}
+               {/* Note: past-day warning is handled by min date; keep UI simple */}
             </div>
          )}
       </div>
@@ -257,7 +258,7 @@ export default function Step4DateTime({
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-gray-900 flex items-center gap-2">
               <Clock className="w-5 h-5 text-primary-500" />
-              Chọn giờ - {format(new Date(selectedDate), 'dd/MM/yyyy')}
+              Chọn giờ - {selectedDate ? salonDateLabel(selectedDate, salonTimezone, 'dd/MM/yyyy') : ''}
             </h3>
             {hasPreselectedTime && selectedTime && !isEditingTime && (
               <button 

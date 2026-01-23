@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { startOfDay } from 'date-fns'
+import { addMinutes } from 'date-fns'
+import { fromZonedTime, toZonedTime } from 'date-fns-tz'
+import { getSalonTz } from '@/lib/timezone'
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,30 +11,40 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date')
     const time = searchParams.get('time')
     const serviceId = searchParams.get('serviceId')
+    const serviceIdsParam = searchParams.get('serviceIds')
 
-    if (!salonId || !date || !time || !serviceId) {
+    if (!salonId || !date || !time || (!serviceId && !serviceIdsParam)) {
       return NextResponse.json(
         { error: 'Missing parameters' },
         { status: 400 }
       )
     }
 
-    // Get service duration
-    const service = await prisma.service.findUnique({
-      where: { id: serviceId },
-    })
-
-    if (!service) {
-      return NextResponse.json(
-        { error: 'Service not found' },
-        { status: 404 }
-      )
+    // Determine service IDs (support multi-service)
+    const serviceIds = serviceIdsParam ? serviceIdsParam.split(',') : (serviceId ? [serviceId] : [])
+    if (serviceIds.length === 0) {
+      return NextResponse.json({ error: 'No services selected' }, { status: 400 })
     }
 
-    // Parse selected date and time
-    const selectedDateTime = new Date(`${date}T${time}`)
-    const selectedDayOfWeek = selectedDateTime.getDay() // 0 = Sunday, 1 = Monday, etc.
-    const selectedTimeStr = time // "HH:mm"
+    const services = await prisma.service.findMany({
+      where: { id: { in: serviceIds } },
+    })
+    if (services.length !== serviceIds.length) {
+      return NextResponse.json({ error: 'Some services not found' }, { status: 404 })
+    }
+
+    // Salon timezone
+    const salon = await prisma.salon.findUnique({
+      where: { id: salonId },
+      select: { timezone: true },
+    })
+    const tz = getSalonTz(salon?.timezone)
+
+    // Selected datetime (salon-local) converted to UTC for DB comparisons
+    const selectedDateTimeUtc = fromZonedTime(`${date}T${time}:00`, tz)
+    const dayStartUtc = fromZonedTime(`${date}T00:00:00`, tz)
+    const selectedDayOfWeek = toZonedTime(dayStartUtc, tz).getDay()
+    const selectedTimeStr = time // "HH:mm" in salon local
 
     // Get all staff for the salon
     const allStaff = await prisma.staff.findMany({
@@ -43,15 +55,15 @@ export async function GET(request: NextRequest) {
             dayOfWeek: selectedDayOfWeek,
             OR: [
               { date: null }, // Weekly schedule
-              { date: startOfDay(selectedDateTime) }, // Specific date schedule
+              { date: dayStartUtc }, // Specific date schedule (midnight in salon timezone, converted to UTC)
             ],
           },
         },
         appointments: {
           where: {
             startTime: {
-              gte: new Date(selectedDateTime.getFullYear(), selectedDateTime.getMonth(), selectedDateTime.getDate()),
-              lt: new Date(selectedDateTime.getFullYear(), selectedDateTime.getMonth(), selectedDateTime.getDate() + 1),
+              gte: dayStartUtc,
+              lt: fromZonedTime(`${date}T23:59:59.999`, tz),
             },
             status: {
               not: 'CANCELLED',
@@ -60,7 +72,7 @@ export async function GET(request: NextRequest) {
         },
         staffServices: {
           where: {
-            serviceId,
+            serviceId: { in: serviceIds },
           },
         },
       },
@@ -68,9 +80,12 @@ export async function GET(request: NextRequest) {
 
     // Filter staff based on schedule
     const availableStaff = allStaff.filter((staff) => {
-      // Lấy duration riêng của thợ này cho dịch vụ này
-      const staffService = staff.staffServices.find((ss) => ss.serviceId === serviceId)
-      const duration = staffService?.duration ?? service.duration
+      // Total duration for selected services (use staff-specific duration when available)
+      const duration = services.reduce((sum, svc) => {
+        const ss = staff.staffServices.find((x) => x.serviceId === svc.id)
+        return sum + (ss?.duration ?? svc.duration)
+      }, 0)
+
       // Check if staff has schedule for this day
       // Schedules are already filtered in the query above
       if (staff.schedules.length === 0) {
@@ -121,11 +136,11 @@ export async function GET(request: NextRequest) {
       const hasConflict = staff.appointments.some((apt) => {
         const aptStart = new Date(apt.startTime)
         const aptEnd = new Date(apt.endTime)
+        const selectedEndUtc = addMinutes(selectedDateTimeUtc, duration)
         return (
-          (selectedDateTime >= aptStart && selectedDateTime < aptEnd) ||
-          (new Date(selectedDateTime.getTime() + duration * 60000) > aptStart &&
-            new Date(selectedDateTime.getTime() + duration * 60000) <= aptEnd) ||
-          (selectedDateTime <= aptStart && new Date(selectedDateTime.getTime() + duration * 60000) >= aptEnd)
+          (selectedDateTimeUtc >= aptStart && selectedDateTimeUtc < aptEnd) ||
+          (selectedEndUtc > aptStart && selectedEndUtc <= aptEnd) ||
+          (selectedDateTimeUtc <= aptStart && selectedEndUtc >= aptEnd)
         )
       })
 

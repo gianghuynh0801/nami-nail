@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
         slug: salon.slug,
         address: salon.address,
         phone: salon.phone,
+        timezone: salon.timezone,
       },
       services: salon.services,
       staff: salon.staff,

@@ -9,6 +9,7 @@ const updateSalonSchema = z.object({
   slug: z.string().min(1).optional(),
   address: z.string().min(1).optional(),
   phone: z.string().min(1).optional(),
+  timezone: z.string().min(1).optional(),
 })
 
 export async function GET(

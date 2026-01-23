@@ -10,6 +10,7 @@ import StepStaff from './steps/StepStaff'
 import StepDateTime from './steps/StepDateTime'
 import StepCustomerInfo from './steps/StepCustomerInfo'
 import StepConfirmation from './steps/StepConfirmation'
+import { salonLocalToUtcISOString } from '@/lib/timezone'
 
 interface Service {
   id: string
@@ -30,6 +31,7 @@ interface Salon {
   slug: string
   address: string
   phone: string
+  timezone?: string
 }
 
 interface BookingWizardProps {
@@ -174,7 +176,7 @@ export default function BookingWizard({ salon: initialSalon, services: initialSe
         throw new Error('Vui lòng chọn ít nhất một dịch vụ')
       }
 
-      const startTime = new Date(`${selectedDate}T${selectedTime}`)
+      const startTimeISO = salonLocalToUtcISOString(selectedDate, selectedTime, salon.timezone)
 
       const response = await fetch('/api/booking', {
         method: 'POST',
@@ -185,7 +187,7 @@ export default function BookingWizard({ salon: initialSalon, services: initialSe
           customerPhone: customerInfo.phone,
           serviceIds: selectedServiceIds,
           staffId: selectedStaffId,
-          startTime: startTime.toISOString(),
+          startTime: startTimeISO,
         }),
       })
 
@@ -259,6 +261,7 @@ export default function BookingWizard({ salon: initialSalon, services: initialSe
             salonId={salon.id}
             serviceIds={selectedServiceIds}
             staffId={selectedStaffId}
+            salonTimezone={salon.timezone}
             selectedDate={selectedDate}
             selectedTime={selectedTime}
             onSelectDate={setSelectedDate}

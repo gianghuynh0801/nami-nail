@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { addMinutes, setHours, setMinutes, startOfDay, format, isBefore } from 'date-fns'
+import { addMinutes } from 'date-fns'
+import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz'
+import { getSalonTz } from '@/lib/timezone'
 
 export async function GET(request: NextRequest) {
   try {
@@ -50,9 +52,17 @@ export async function GET(request: NextRequest) {
        totalDuration += staffService?.duration ?? service.duration
     }
 
-    // Get staff schedule for the selected day
-    const selectedDateObj = new Date(date)
-    const dayOfWeek = selectedDateObj.getDay() // 0 = Sunday, 1 = Monday, etc.
+    // Get salon timezone (fallback to Asia/Ho_Chi_Minh)
+    const salon = await prisma.salon.findUnique({
+      where: { id: salonId },
+      select: { timezone: true },
+    })
+    const tz = getSalonTz(salon?.timezone)
+
+    // Get staff schedule for the selected day in salon timezone
+    const dayStartUtc = fromZonedTime(`${date}T00:00:00`, tz)
+    const dayStartZoned = toZonedTime(dayStartUtc, tz)
+    const dayOfWeek = dayStartZoned.getDay() // 0 = Sunday, 1 = Monday, etc.
 
     let schedule = await prisma.staffSchedule.findFirst({
       where: {
@@ -60,7 +70,7 @@ export async function GET(request: NextRequest) {
         dayOfWeek,
         OR: [
           { date: null }, // Weekly schedule
-          { date: startOfDay(selectedDateObj) }, // Specific date schedule
+          { date: dayStartUtc }, // Specific date schedule (stored as midnight in salon timezone, converted to UTC)
         ],
       },
     })
@@ -120,10 +130,9 @@ export async function GET(request: NextRequest) {
       breakEnd = breakEndHour * 60 + breakEndMin
     }
 
-    // Get existing appointments for the day
-    const startOfSelectedDay = startOfDay(new Date(date))
-    const endOfSelectedDay = new Date(startOfSelectedDay)
-    endOfSelectedDay.setHours(23, 59, 59, 999)
+    // Get existing appointments for the day (range calculated in salon timezone, converted to UTC)
+    const startOfSelectedDay = dayStartUtc
+    const endOfSelectedDay = fromZonedTime(`${date}T23:59:59.999`, tz)
 
     const appointments = await prisma.appointment.findMany({
       where: {
@@ -155,15 +164,22 @@ export async function GET(request: NextRequest) {
        })
     }
 
-    // Generate slots for all 24 hours
+    // Generate slots for all 24 hours (time labels are salon-local, stored/checked in UTC)
+    const nowUtc = new Date()
     for (let hour = 0; hour < 24; hour++) {
       for (let minute = 0; minute < 60; minute += 30) {
-        const slotStart = setMinutes(setHours(startOfSelectedDay, hour), minute)
+        const hh = String(hour).padStart(2, '0')
+        const mm = String(minute).padStart(2, '0')
+
+        const slotStart = fromZonedTime(`${date}T${hh}:${mm}:00`, tz)
         const slotEnd = addMinutes(slotStart, totalDuration) // Use total duration
 
-        // Check if slot is in the past
-        if (isBefore(slotStart, new Date())) {
-           continue
+        // Check if slot is in the past (compare in UTC)
+        if (slotStart < nowUtc) {
+          if (includeDetails) {
+            timeSlots.push({ time: `${hh}:${mm}`, available: false, reason: 'past' })
+          }
+          continue
         }
 
         // Check if slot is within schedule
@@ -187,25 +203,27 @@ export async function GET(request: NextRequest) {
         }
 
         if (isBreak) {
-           if (includeDetails) {
-              timeSlots.push({ time: format(slotStart, 'HH:mm'), available: false, reason: 'break' })
-           }
+          if (includeDetails) {
+            timeSlots.push({ time: `${hh}:${mm}`, available: false, reason: 'break' })
+          }
            continue
         }
 
         // Check if slot overlaps with existing appointments
         const hasOverlap = checkOverlap(slotStart, slotEnd)
 
+        const label = formatInTimeZone(slotStart, tz, 'HH:mm')
+
         if (hasOverlap) {
-           if (includeDetails) {
-              timeSlots.push({ time: format(slotStart, 'HH:mm'), available: false, reason: 'booked' })
-           }
+          if (includeDetails) {
+            timeSlots.push({ time: label, available: false, reason: 'booked' })
+          }
         } else {
-           if (includeDetails) {
-              timeSlots.push({ time: format(slotStart, 'HH:mm'), available: true })
-           } else {
-              timeSlots.push(format(slotStart, 'HH:mm'))
-           }
+          if (includeDetails) {
+            timeSlots.push({ time: label, available: true })
+          } else {
+            timeSlots.push(label)
+          }
         }
       }
     }

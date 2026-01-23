@@ -8,6 +8,7 @@ interface Salon {
   slug: string
   address: string
   phone: string
+  timezone?: string
 }
 
 interface SalonContextType {

@@ -9,6 +9,7 @@ const salonSchema = z.object({
   slug: z.string().min(1),
   address: z.string().min(1),
   phone: z.string().min(1),
+  timezone: z.string().min(1).optional(),
 })
 
 export async function GET(request: Request) {
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { name, slug, address, phone } = salonSchema.parse(body)
+    const { name, slug, address, phone, timezone } = salonSchema.parse(body)
 
     // Check if slug already exists
     const existingSalon = await prisma.salon.findUnique({
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
         slug,
         address,
         phone,
+        timezone: timezone || undefined,
         ownerId: session.user.id,
       },
     })

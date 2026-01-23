@@ -4,6 +4,7 @@ export interface Salon {
   address: string
   phone: string
   slug: string
+  timezone?: string
 }
 
 export interface Service {
