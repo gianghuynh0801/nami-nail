@@ -55,14 +55,39 @@ const DAYS = [
 
 const scheduleSchema = z.object({
   staffId: z.string().min(1, 'Vui lòng chọn nhân viên'),
-  selectedDays: z.array(z.number()).min(1, 'Vui lòng chọn ít nhất một ngày'),
+  scheduleMode: z.enum(['weekly', 'single', 'range']), // weekly = lặp lại hàng tuần, single = 1 ngày, range = từ ngày - đến ngày
+  selectedDays: z.array(z.number()).optional(), // Chỉ dùng khi mode = 'weekly'
   startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Giờ bắt đầu không hợp lệ (HH:mm)'),
   endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Giờ kết thúc không hợp lệ (HH:mm)'),
   breakStart: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Giờ nghỉ bắt đầu không hợp lệ').optional().nullable().or(z.literal('')),
   breakEnd: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Giờ nghỉ kết thúc không hợp lệ').optional().nullable().or(z.literal('')),
-  date: z.string().optional().nullable(),
+  date: z.string().optional().nullable(), // Chỉ dùng khi mode = 'single'
+  dateRangeStart: z.string().optional().nullable(), // Chỉ dùng khi mode = 'range'
+  dateRangeEnd: z.string().optional().nullable(), // Chỉ dùng khi mode = 'range'
   isAllDay: z.boolean().optional(),
   hasBreak: z.boolean().optional(),
+}).refine((data) => {
+  // Validate based on mode
+  if (data.scheduleMode === 'weekly' && (!data.selectedDays || data.selectedDays.length === 0)) {
+    return false
+  }
+  if (data.scheduleMode === 'single' && !data.date) {
+    return false
+  }
+  if (data.scheduleMode === 'range') {
+    if (!data.dateRangeStart || !data.dateRangeEnd) {
+      return false
+    }
+    const start = new Date(data.dateRangeStart)
+    const end = new Date(data.dateRangeEnd)
+    if (end < start) {
+      return false
+    }
+  }
+  return true
+}, {
+  message: 'Vui lòng điền đầy đủ thông tin ngày áp dụng',
+  path: ['scheduleMode'],
 }).refine((data) => {
   const [startHour, startMin] = data.startTime.split(':').map(Number)
   const [endHour, endMin] = data.endTime.split(':').map(Number)
@@ -127,7 +152,10 @@ export default function WorkSchedulePage() {
     formState: { errors },
   } = useForm<ScheduleFormData>({
     resolver: zodResolver(scheduleSchema),
-    defaultValues: { selectedDays: [] },
+    defaultValues: { 
+      selectedDays: [],
+      scheduleMode: 'weekly',
+    },
   })
 
   // --- Calculations ---
@@ -200,14 +228,18 @@ export default function WorkSchedulePage() {
         // Edit existing
         setEditingSchedule(currentSchedule)
         setSelectedDaysInModal([currentSchedule.dayOfWeek])
+        const hasDate = !!currentSchedule.date
         reset({
            staffId: staffId,
-           selectedDays: [currentSchedule.dayOfWeek],
+           scheduleMode: hasDate ? 'single' : 'weekly',
+           selectedDays: hasDate ? [] : [currentSchedule.dayOfWeek],
            startTime: currentSchedule.startTime,
            endTime: currentSchedule.endTime,
            breakStart: currentSchedule.breakStart || '',
            breakEnd: currentSchedule.breakEnd || '',
            date: currentSchedule.date ? new Date(currentSchedule.date).toISOString().split('T')[0] : '',
+           dateRangeStart: '',
+           dateRangeEnd: '',
            isAllDay: currentSchedule.startTime === '00:00' && currentSchedule.endTime === '23:59',
            hasBreak: !!(currentSchedule.breakStart && currentSchedule.breakEnd),
         })
@@ -218,12 +250,15 @@ export default function WorkSchedulePage() {
         setSelectedDaysInModal([dayOfWeek])
         reset({
            staffId: staffId,
+           scheduleMode: 'weekly',
            selectedDays: [dayOfWeek],
            startTime: '00:00',
            endTime: '23:59',
            breakStart: '',
            breakEnd: '',
-           date: format(day, 'yyyy-MM-dd'),
+           date: '',
+           dateRangeStart: '',
+           dateRangeEnd: '',
            isAllDay: true, // Default to all day
            hasBreak: false,
         })
@@ -236,37 +271,76 @@ export default function WorkSchedulePage() {
     setFormError('')
     
     // Sanitize data
-    const submissionData = { ...data }
-    
-    // If not using break, clear break times
-    if (!submissionData.hasBreak) {
-       submissionData.breakStart = null
-       submissionData.breakEnd = null
+    const submissionData: any = {
+      staffId: data.staffId,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      breakStart: data.hasBreak ? (data.breakStart || null) : null,
+      breakEnd: data.hasBreak ? (data.breakEnd || null) : null,
     }
-    
-    // Remove helper fields
-    delete (submissionData as any).isAllDay
-    delete (submissionData as any).hasBreak
 
     try {
        if (editingSchedule) {
-          // Update
+          // Update - only single schedule
+          const dayOfWeek = data.scheduleMode === 'weekly' && data.selectedDays?.[0] !== undefined 
+            ? data.selectedDays[0] 
+            : editingSchedule.dayOfWeek
+          const date = data.scheduleMode === 'single' ? data.date : (data.scheduleMode === 'range' ? null : editingSchedule.date)
+          
           const res = await fetch(`/api/schedules/${editingSchedule.id}`, {
              method: 'PUT',
              headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({ ...submissionData, dayOfWeek: data.selectedDays[0] })
+             body: JSON.stringify({ ...submissionData, dayOfWeek, date })
           })
           if (!res.ok) throw new Error('Failed to update')
        } else {
-          // Create
-          const promises = data.selectedDays.map(dayOfWeek => 
-             fetch('/api/schedules', {
+          // Create - handle different modes
+          if (data.scheduleMode === 'weekly') {
+             // Create for each selected day of week
+             const promises = (data.selectedDays || []).map(dayOfWeek => 
+                fetch('/api/schedules', {
+                   method: 'POST',
+                   headers: { 'Content-Type': 'application/json' },
+                   body: JSON.stringify({ ...submissionData, dayOfWeek, date: null })
+                })
+             )
+             await Promise.all(promises)
+          } else if (data.scheduleMode === 'single') {
+             // Create for single date
+             if (!data.date) throw new Error('Vui lòng chọn ngày')
+             const dateObj = new Date(data.date)
+             const dayOfWeek = dateObj.getDay()
+             await fetch('/api/schedules', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...submissionData, dayOfWeek })
+                body: JSON.stringify({ ...submissionData, dayOfWeek, date: data.date })
              })
-          )
-          await Promise.all(promises)
+          } else if (data.scheduleMode === 'range') {
+             // Create for each day in date range
+             if (!data.dateRangeStart || !data.dateRangeEnd) throw new Error('Vui lòng chọn từ ngày và đến ngày')
+             const startDate = new Date(data.dateRangeStart)
+             const endDate = new Date(data.dateRangeEnd)
+             
+             if (endDate < startDate) throw new Error('Ngày kết thúc phải lớn hơn ngày bắt đầu')
+             
+             const promises: Promise<Response>[] = []
+             const currentDate = new Date(startDate)
+             
+             while (currentDate <= endDate) {
+                const dayOfWeek = currentDate.getDay()
+                const dateStr = currentDate.toISOString().split('T')[0]
+                promises.push(
+                   fetch('/api/schedules', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ ...submissionData, dayOfWeek, date: dateStr })
+                   })
+                )
+                currentDate.setDate(currentDate.getDate() + 1)
+             }
+             
+             await Promise.all(promises)
+          }
        }
        setShowModal(false)
        fetchSchedules()
@@ -318,7 +392,7 @@ export default function WorkSchedulePage() {
   }
 
   const toggleDayInModal = (val: number) => {
-     const current = watch('selectedDays')
+     const current = watch('selectedDays') || []
      if (current.includes(val)) setValue('selectedDays', current.filter(d => d !== val))
      else setValue('selectedDays', [...current, val])
   }
@@ -563,26 +637,102 @@ export default function WorkSchedulePage() {
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                  {formError && <div className="bg-red-50 text-red-600 p-3 rounded">{formError}</div>}
                  
-                 {/* Days Selection */}
+                 {/* Schedule Mode Selection */}
                  <div>
-                    <label className="block text-sm font-medium mb-2">Ngày áp dụng</label>
-                    <div className="flex flex-wrap gap-2">
-                       {DAYS.map(day => (
-                          <button
-                             key={day.value}
-                             type="button"
-                             onClick={() => toggleDayInModal(day.value)}
-                             className={`
-                                width-8 h-8 px-3 py-1 rounded text-sm border transition-colors
-                                ${watch('selectedDays').includes(day.value) ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-700 hover:bg-gray-50'}
-                             `}
-                          >
-                             {day.label}
-                          </button>
-                       ))}
+                    <label className="block text-sm font-medium mb-2">Chế độ áp dụng</label>
+                    <div className="space-y-2">
+                       <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                             type="radio" 
+                             value="weekly"
+                             {...register('scheduleMode')}
+                             className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                          />
+                          <span className="text-sm text-gray-700">Lặp lại hàng tuần</span>
+                       </label>
+                       <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                             type="radio" 
+                             value="single"
+                             {...register('scheduleMode')}
+                             className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                          />
+                          <span className="text-sm text-gray-700">Một ngày cụ thể</span>
+                       </label>
+                       <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                             type="radio" 
+                             value="range"
+                             {...register('scheduleMode')}
+                             className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                          />
+                          <span className="text-sm text-gray-700">Từ ngày - đến ngày</span>
+                       </label>
                     </div>
-                    {watch('selectedDays').length === 0 && <p className="text-red-500 text-xs mt-1">Chọn ít nhất một ngày</p>}
                  </div>
+                 
+                 {/* Days Selection - Only show for weekly mode */}
+                 {watch('scheduleMode') === 'weekly' && (
+                    <div>
+                       <label className="block text-sm font-medium mb-2">Ngày trong tuần</label>
+                       <div className="flex flex-wrap gap-2">
+                          {DAYS.map(day => (
+                             <button
+                                key={day.value}
+                                type="button"
+                                onClick={() => toggleDayInModal(day.value)}
+                                className={`
+                                   width-8 h-8 px-3 py-1 rounded text-sm border transition-colors
+                                   ${(watch('selectedDays') || []).includes(day.value) ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-700 hover:bg-gray-50'}
+                                `}
+                             >
+                                {day.label}
+                             </button>
+                          ))}
+                       </div>
+                       {(!watch('selectedDays') || watch('selectedDays')?.length === 0) && <p className="text-red-500 text-xs mt-1">Chọn ít nhất một ngày</p>}
+                    </div>
+                 )}
+                 
+                 {/* Single Date - Only show for single mode */}
+                 {watch('scheduleMode') === 'single' && (
+                    <div>
+                       <label className="block text-sm font-medium mb-2">Ngày cụ thể</label>
+                       <input 
+                          type="date" 
+                          {...register('date')} 
+                          className="w-full border rounded-lg px-3 py-2" 
+                       />
+                       {errors.date && <p className="text-red-500 text-xs mt-1">{errors.date.message}</p>}
+                    </div>
+                 )}
+                 
+                 {/* Date Range - Only show for range mode */}
+                 {watch('scheduleMode') === 'range' && (
+                    <div>
+                       <label className="block text-sm font-medium mb-2">Khoảng thời gian</label>
+                       <div className="grid grid-cols-2 gap-4">
+                          <div>
+                             <label className="block text-xs text-gray-500 mb-1">Từ ngày</label>
+                             <input 
+                                type="date" 
+                                {...register('dateRangeStart')} 
+                                className="w-full border rounded-lg px-3 py-2" 
+                             />
+                             {errors.dateRangeStart && <p className="text-red-500 text-xs mt-1">{errors.dateRangeStart.message}</p>}
+                          </div>
+                          <div>
+                             <label className="block text-xs text-gray-500 mb-1">Đến ngày</label>
+                             <input 
+                                type="date" 
+                                {...register('dateRangeEnd')} 
+                                className="w-full border rounded-lg px-3 py-2" 
+                             />
+                             {errors.dateRangeEnd && <p className="text-red-500 text-xs mt-1">{errors.dateRangeEnd.message}</p>}
+                          </div>
+                       </div>
+                    </div>
+                 )}
                  
                  {/* All Day Toggle */}
                  <div className="flex items-center gap-2">
@@ -648,12 +798,6 @@ export default function WorkSchedulePage() {
                            </div>
                         </div>
                     )}
-                 </div>
-                 
-                 {/* Date Override */}
-                 <div className="flex items-center gap-2 mt-2 pt-2 border-t border-dashed">
-                    <input type="date" {...register('date')} className="border rounded-lg px-3 py-2 text-sm" />
-                    <span className="text-xs text-gray-500">Chọn ngày cụ thể nếu không muốn lặp lại hàng tuần</span>
                  </div>
 
                  <div className="flex gap-3 mt-6 pt-4 border-t">
