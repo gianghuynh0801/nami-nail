@@ -53,7 +53,6 @@ export default function TimeSlot({
         absolute w-full
         transition-colors duration-150
         ${minute === 0 ? '' : 'border-t border-dashed border-beige-dark/20'}
-        ${isPast ? 'bg-gray-200/60' : ''}
         ${!isPast && isWorking && !isBreak ? 'bg-primary-50/50' : ''}
         ${isBreak ? 'bg-beige bg-stripes' : ''}
         ${!isWorking && !isBreak && !isPast ? 'bg-gray-200' : ''}
