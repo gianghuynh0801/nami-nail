@@ -598,6 +598,7 @@ export default function AppointmentDetailModal({
                </div>
 
               <div className="flex gap-2">
+                 {/* Allow editing even if appointment time has passed - only restrict by status */}
                  {appointment.status !== 'COMPLETED' && appointment.status !== 'CANCELLED' && (
                    <button onClick={() => setIsEditing(true)} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium">
                      <Edit2 className="w-4 h-4" /> Sửa
