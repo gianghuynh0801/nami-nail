@@ -44,6 +44,9 @@ export default function StaffCalendarView({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const staffScrollRef = useRef<HTMLDivElement>(null);
   const headerScrollRef = useRef<HTMLDivElement>(null);
+  const isPanningRef = useRef(false);
+  const panStartXRef = useRef(0);
+  const panStartScrollLeftRef = useRef(0);
 
   const {
     staff,
@@ -104,6 +107,48 @@ export default function StaffCalendarView({
     if (staffScrollRef.current && headerScrollRef.current) {
       staffScrollRef.current.scrollLeft = headerScrollRef.current.scrollLeft;
     }
+  }, []);
+
+  const startHorizontalPan = useCallback(
+    (e: React.PointerEvent, target: "header" | "body") => {
+      // Only pan for primary click / touch contact
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+
+      const el =
+        target === "header" ? headerScrollRef.current : staffScrollRef.current;
+      if (!el) return;
+
+      isPanningRef.current = true;
+      panStartXRef.current = e.clientX;
+      panStartScrollLeftRef.current = el.scrollLeft;
+
+      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    },
+    [],
+  );
+
+  const moveHorizontalPan = useCallback(
+    (e: React.PointerEvent, target: "header" | "body") => {
+      if (!isPanningRef.current) return;
+
+      const el =
+        target === "header" ? headerScrollRef.current : staffScrollRef.current;
+      if (!el) return;
+
+      const dx = e.clientX - panStartXRef.current;
+      el.scrollLeft = panStartScrollLeftRef.current - dx;
+
+      // Keep header/body in sync
+      if (target === "body") handleBodyScroll();
+      else handleHeaderScroll();
+    },
+    [handleBodyScroll, handleHeaderScroll],
+  );
+
+  const endHorizontalPan = useCallback((e: React.PointerEvent) => {
+    if (!isPanningRef.current) return;
+    isPanningRef.current = false;
+    (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
   }, []);
 
   // Handle assign from waiting list
@@ -339,6 +384,11 @@ export default function StaffCalendarView({
               ref={headerScrollRef}
               className="flex-1 overflow-x-auto pb-2"
               onScroll={handleHeaderScroll}
+              onPointerDown={(e) => startHorizontalPan(e, "header")}
+              onPointerMove={(e) => moveHorizontalPan(e, "header")}
+              onPointerUp={endHorizontalPan}
+              onPointerCancel={endHorizontalPan}
+              style={{ cursor: "grab", touchAction: "pan-y" }}
             >
               <div className="flex" style={{ width: "fit-content" }}>
                 {staff.map((s) => (
@@ -374,6 +424,11 @@ export default function StaffCalendarView({
                   ref={staffScrollRef}
                   className="flex-1 overflow-x-auto pb-2"
                   onScroll={handleBodyScroll}
+                  onPointerDown={(e) => startHorizontalPan(e, "body")}
+                  onPointerMove={(e) => moveHorizontalPan(e, "body")}
+                  onPointerUp={endHorizontalPan}
+                  onPointerCancel={endHorizontalPan}
+                  style={{ cursor: "grab", touchAction: "pan-y" }}
                 >
                   <div
                     className="flex relative"
