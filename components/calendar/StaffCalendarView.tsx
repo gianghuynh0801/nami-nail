@@ -1,58 +1,59 @@
-'use client'
+"use client";
 
-import { useState, useRef, useCallback } from 'react'
-import { format, addDays, subDays } from 'date-fns'
-import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react'
-import CalendarHeader from './CalendarHeader'
-import TimeColumn from './TimeColumn'
-import StaffColumn from './StaffColumn'
-import StaffColumnHeader from './StaffColumnHeader'
-import WaitingListSidebar from './WaitingListSidebar'
-import QueueList from './QueueList'
-import NotificationCenter from './NotificationCenter'
-import CurrentTimeLine from './CurrentTimeLine'
-import AppointmentDetailModal from './AppointmentDetailModal'
+import { useState, useRef, useCallback } from "react";
+import { format, addDays, subDays } from "date-fns";
+import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import CalendarHeader from "./CalendarHeader";
+import TimeColumn from "./TimeColumn";
+import StaffColumn from "./StaffColumn";
+import StaffColumnHeader from "./StaffColumnHeader";
+import WaitingListSidebar from "./WaitingListSidebar";
+import QueueList from "./QueueList";
+import NotificationCenter from "./NotificationCenter";
+import CurrentTimeLine from "./CurrentTimeLine";
+import AppointmentDetailModal from "./AppointmentDetailModal";
 
-import { useCalendarData } from './hooks/useCalendarData'
-import { useCalendarDragDrop } from './hooks/useCalendarDragDrop'
-import { useAutoScroll } from './hooks/useAutoScroll'
-import { CALENDAR_CONFIG } from './constants'
-import { checkWorkingHour } from './utils'
-import type { CalendarAppointment, WaitingAppointment } from './types'
+import { useCalendarData } from "./hooks/useCalendarData";
+import { useCalendarDragDrop } from "./hooks/useCalendarDragDrop";
+import { useAutoScroll } from "./hooks/useAutoScroll";
+import { CALENDAR_CONFIG } from "./constants";
+import { checkWorkingHour } from "./utils";
+import type { CalendarAppointment, WaitingAppointment } from "./types";
 
 interface StaffCalendarViewProps {
-  salonId: string
-  onAddAppointment?: () => void
-  onAppointmentClick?: (appointment: CalendarAppointment) => void
-  onTimeSlotClick?: (staffId: string, time: string, date: Date) => void
-  isAdmin?: boolean
+  salonId: string;
+  onAddAppointment?: () => void;
+  onAppointmentClick?: (appointment: CalendarAppointment) => void;
+  onTimeSlotClick?: (staffId: string, time: string, date: Date) => void;
+  isAdmin?: boolean;
 }
 
-export default function StaffCalendarView({ 
+export default function StaffCalendarView({
   salonId,
   onAddAppointment,
   onAppointmentClick,
   onTimeSlotClick,
   isAdmin = false,
 }: StaffCalendarViewProps) {
-  const [selectedDate, setSelectedDate] = useState(new Date())
-  const [showWaitingList, setShowWaitingList] = useState(true)
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showWaitingList, setShowWaitingList] = useState(true);
 
-  const [selectedAppointment, setSelectedAppointment] = useState<CalendarAppointment | null>(null)
-  const [selectedStaffName, setSelectedStaffName] = useState('')
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const staffScrollRef = useRef<HTMLDivElement>(null)
-  const headerScrollRef = useRef<HTMLDivElement>(null)
+  const [selectedAppointment, setSelectedAppointment] =
+    useState<CalendarAppointment | null>(null);
+  const [selectedStaffName, setSelectedStaffName] = useState("");
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const staffScrollRef = useRef<HTMLDivElement>(null);
+  const headerScrollRef = useRef<HTMLDivElement>(null);
 
-  const { 
-    staff, 
-    waitingList, 
+  const {
+    staff,
+    waitingList,
     isLoading,
     error,
     refetch,
     moveAppointment,
     assignFromWaitingList,
-  } = useCalendarData(salonId, selectedDate)
+  } = useCalendarData(salonId, selectedDate);
 
   const {
     dragState,
@@ -63,170 +64,195 @@ export default function StaffCalendarView({
     cancelDrag,
   } = useCalendarDragDrop({
     onMoveAppointment: async (appointmentId, newStaffId, newStartTime) => {
-      await moveAppointment(appointmentId, newStaffId, newStartTime)
+      await moveAppointment(appointmentId, newStaffId, newStartTime);
     },
     validateDrop: (staffId, time) => {
-      const staffMember = staff.find(s => s.id === staffId)
-      if (!staffMember) return false
-      const [hour, minute] = time.split(':').map(Number)
-      return checkWorkingHour(staffMember, hour, minute) === 'working'
-    }
-  })
+      const staffMember = staff.find((s) => s.id === staffId);
+      if (!staffMember) return false;
+      const [hour, minute] = time.split(":").map(Number);
+      return checkWorkingHour(staffMember, hour, minute) === "working";
+    },
+  });
 
   // Auto-scroll to current time on mount
-  useAutoScroll(scrollContainerRef, selectedDate)
+  useAutoScroll(scrollContainerRef, selectedDate);
 
   // Get checked-in appointments from all staff
-  const checkedInAppointments = staff.flatMap(s => 
-    s.appointments.filter(apt => apt.status === 'CHECKED_IN')
-  )
+  const checkedInAppointments = staff.flatMap((s) =>
+    s.appointments.filter((apt) => apt.status === "CHECKED_IN"),
+  );
 
   const handleDateChange = (date: Date) => {
-    setSelectedDate(date)
-  }
+    setSelectedDate(date);
+  };
 
-  const handlePrevDay = () => setSelectedDate(prev => subDays(prev, 1))
-  const handleNextDay = () => setSelectedDate(prev => addDays(prev, 1))
-  const handleToday = () => setSelectedDate(new Date())
+  const handlePrevDay = () => setSelectedDate((prev) => subDays(prev, 1));
+  const handleNextDay = () => setSelectedDate((prev) => addDays(prev, 1));
+  const handleToday = () => setSelectedDate(new Date());
 
-  const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
+  const isToday =
+    format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
 
   // Sync horizontal scroll between header and body
   const handleBodyScroll = useCallback(() => {
     if (staffScrollRef.current && headerScrollRef.current) {
-      headerScrollRef.current.scrollLeft = staffScrollRef.current.scrollLeft
+      headerScrollRef.current.scrollLeft = staffScrollRef.current.scrollLeft;
     }
-  }, [])
+  }, []);
 
   const handleHeaderScroll = useCallback(() => {
     if (staffScrollRef.current && headerScrollRef.current) {
-      staffScrollRef.current.scrollLeft = headerScrollRef.current.scrollLeft
+      staffScrollRef.current.scrollLeft = headerScrollRef.current.scrollLeft;
     }
-  }, [])
+  }, []);
 
   // Handle assign from waiting list
-  const handleAssignFromWaitingList = useCallback((
-    appointment: WaitingAppointment, 
-    staffId: string, 
-    time: string
-  ) => {
-    assignFromWaitingList(appointment.id, staffId, time)
-  }, [assignFromWaitingList])
+  const handleAssignFromWaitingList = useCallback(
+    (appointment: WaitingAppointment, staffId: string, time: string) => {
+      assignFromWaitingList(appointment.id, staffId, time);
+    },
+    [assignFromWaitingList],
+  );
 
   // Handle appointment click - show detail modal
-  const handleAppointmentClick = useCallback((appointment: CalendarAppointment) => {
-    const staffMember = staff.find(s => s.id === appointment.staffId)
-    setSelectedStaffName(staffMember?.name || '')
-    setSelectedAppointment(appointment)
-    
-    // Also call external handler if provided
-    if (onAppointmentClick) {
-      onAppointmentClick(appointment)
-    }
-  }, [staff, onAppointmentClick])
+  const handleAppointmentClick = useCallback(
+    (appointment: CalendarAppointment) => {
+      const staffMember = staff.find((s) => s.id === appointment.staffId);
+      setSelectedStaffName(staffMember?.name || "");
+      setSelectedAppointment(appointment);
+
+      // Also call external handler if provided
+      if (onAppointmentClick) {
+        onAppointmentClick(appointment);
+      }
+    },
+    [staff, onAppointmentClick],
+  );
 
   // Handle appointment actions
-  const handleCheckIn = useCallback(async (appointmentId: string) => {
-    try {
-      const res = await fetch('/api/shift/checkin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appointmentId, salonId }),
-      })
-      if (!res.ok) {
-        const error = await res.json()
-        throw new Error(error.error || 'Failed to check-in appointment')
+  const handleCheckIn = useCallback(
+    async (appointmentId: string) => {
+      try {
+        const res = await fetch("/api/shift/checkin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ appointmentId, salonId }),
+        });
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.error || "Failed to check-in appointment");
+        }
+        // Refresh data after check-in
+        refetch();
+      } catch (error: any) {
+        console.error("Error checking in appointment:", error);
+        throw error;
       }
-      // Refresh data after check-in
-      refetch()
-    } catch (error: any) {
-      console.error('Error checking in appointment:', error)
-      throw error
-    }
-  }, [salonId, refetch])
+    },
+    [salonId, refetch],
+  );
 
-  const handleStartAppointment = useCallback(async (appointmentId: string) => {
-    try {
-      const res = await fetch('/api/shift/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appointmentId, salonId }),
-      })
-      if (!res.ok) {
-        const error = await res.json()
-        throw new Error(error.error || 'Failed to start appointment')
+  const handleStartAppointment = useCallback(
+    async (appointmentId: string) => {
+      try {
+        const res = await fetch("/api/shift/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ appointmentId, salonId }),
+        });
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.error || "Failed to start appointment");
+        }
+        // Refresh data after starting
+        refetch();
+      } catch (error: any) {
+        console.error("Error starting appointment:", error);
+        throw error;
       }
-      // Refresh data after starting
-      refetch()
-    } catch (error: any) {
-      console.error('Error starting appointment:', error)
-      throw error
-    }
-  }, [salonId, refetch])
+    },
+    [salonId, refetch],
+  );
 
-  const handleCompleteAppointment = useCallback(async (appointmentId: string) => {
-    try {
-      const res = await fetch('/api/shift/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          appointmentId,
-          salonId,
-        }),
-      })
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Failed to complete appointment')
+  const handleCompleteAppointment = useCallback(
+    async (appointmentId: string) => {
+      try {
+        const res = await fetch("/api/shift/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            appointmentId,
+            salonId,
+          }),
+        });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to complete appointment");
+        }
+        // Refresh data after completing
+        refetch();
+      } catch (error) {
+        console.error("Error completing appointment:", error);
+        throw error;
       }
-      // Refresh data after completing
-      refetch()
-    } catch (error) {
-      console.error('Error completing appointment:', error)
-      throw error
-    }
-  }, [salonId, refetch])
+    },
+    [salonId, refetch],
+  );
 
-  const handleCancelAppointment = useCallback(async (appointmentId: string) => {
-    try {
-      const res = await fetch(`/api/appointments/${appointmentId}`, {
-        method: 'DELETE',
-      })
-      if (!res.ok) throw new Error('Failed to cancel appointment')
-      // Refresh data after canceling
-      refetch()
-    } catch (error) {
-      console.error('Error canceling appointment:', error)
-      throw error
-    }
-  }, [refetch])
-
-  const handleConfirmAppointment = useCallback(async (appointmentId: string) => {
-    try {
-      const res = await fetch(`/api/appointments/${appointmentId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'CONFIRMED' }),
-      })
-      if (!res.ok) {
-        const error = await res.json()
-        throw new Error(error.error || 'Failed to confirm appointment')
+  const handleCancelAppointment = useCallback(
+    async (appointmentId: string) => {
+      try {
+        const res = await fetch(`/api/appointments/${appointmentId}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) throw new Error("Failed to cancel appointment");
+        // Refresh data after canceling
+        refetch();
+      } catch (error) {
+        console.error("Error canceling appointment:", error);
+        throw error;
       }
-      // Refresh data after confirming
-      refetch()
-    } catch (error: any) {
-      console.error('Error confirming appointment:', error)
-      throw error
-    }
-  }, [refetch])
+    },
+    [refetch],
+  );
+
+  const handleConfirmAppointment = useCallback(
+    async (appointmentId: string) => {
+      try {
+        const res = await fetch(`/api/appointments/${appointmentId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "CONFIRMED" }),
+        });
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.error || "Failed to confirm appointment");
+        }
+        // Refresh data after confirming
+        refetch();
+      } catch (error: any) {
+        console.error("Error confirming appointment:", error);
+        throw error;
+      }
+    },
+    [refetch],
+  );
 
   // Handle drop from waiting list drag
-  const handleWaitingListDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    const appointmentId = e.dataTransfer.getData('appointmentId')
-    if (appointmentId && dragState.dropTarget) {
-      assignFromWaitingList(appointmentId, dragState.dropTarget.staffId, dragState.dropTarget.time)
-    }
-  }, [assignFromWaitingList, dragState.dropTarget])
+  const handleWaitingListDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const appointmentId = e.dataTransfer.getData("appointmentId");
+      if (appointmentId && dragState.dropTarget) {
+        assignFromWaitingList(
+          appointmentId,
+          dragState.dropTarget.staffId,
+          dragState.dropTarget.time,
+        );
+      }
+    },
+    [assignFromWaitingList, dragState.dropTarget],
+  );
 
   if (isLoading) {
     return (
@@ -236,7 +262,7 @@ export default function StaffCalendarView({
           <p className="mt-4 text-gray-600">Đang tải lịch...</p>
         </div>
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -252,7 +278,7 @@ export default function StaffCalendarView({
           </button>
         </div>
       </div>
-    )
+    );
   }
 
   if (staff.length === 0) {
@@ -272,11 +298,13 @@ export default function StaffCalendarView({
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <p className="text-gray-500 mb-2">Chưa có nhân viên nào</p>
-            <p className="text-sm text-gray-400">Vui lòng thêm nhân viên vào salon</p>
+            <p className="text-sm text-gray-400">
+              Vui lòng thêm nhân viên vào salon
+            </p>
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -299,22 +327,20 @@ export default function StaffCalendarView({
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-
-
         {/* Calendar Area */}
         <div className="flex-1 flex flex-col min-w-0">
           {/* Staff Headers (sticky) */}
           <div className="flex border-b border-beige-dark bg-white sticky top-0 z-20 flex-shrink-0">
             {/* Time column header spacer */}
             <div className="w-16 md:w-20 flex-shrink-0 border-r border-beige-dark bg-beige-light" />
-            
+
             {/* Staff column headers - horizontal scroll */}
-            <div 
+            <div
               ref={headerScrollRef}
-              className="flex-1 overflow-x-auto scrollbar-hide"
+              className="flex-1 overflow-x-auto pb-2"
               onScroll={handleHeaderScroll}
             >
-              <div className="flex" style={{ width: 'fit-content' }}>
+              <div className="flex" style={{ width: "fit-content" }}>
                 {staff.map((s) => (
                   <div
                     key={s.id}
@@ -344,12 +370,15 @@ export default function StaffCalendarView({
                 <TimeColumn />
 
                 {/* Staff Columns Container */}
-                <div 
+                <div
                   ref={staffScrollRef}
-                  className="flex-1 overflow-x-auto scrollbar-hide"
+                  className="flex-1 overflow-x-auto pb-2"
                   onScroll={handleBodyScroll}
                 >
-                  <div className="flex relative" style={{ width: 'fit-content' }}>
+                  <div
+                    className="flex relative"
+                    style={{ width: "fit-content" }}
+                  >
                     {staff.map((s) => (
                       <StaffColumn
                         key={s.id}
@@ -364,9 +393,7 @@ export default function StaffCalendarView({
                     ))}
 
                     {/* Current Time Line */}
-                    {isToday && (
-                      <CurrentTimeLine staffCount={staff.length} />
-                    )}
+                    {isToday && <CurrentTimeLine staffCount={staff.length} />}
                   </div>
                 </div>
               </div>
@@ -433,11 +460,11 @@ export default function StaffCalendarView({
       {showWaitingList && (
         <div className="lg:hidden fixed inset-0 z-40">
           {/* Backdrop */}
-          <div 
+          <div
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowWaitingList(false)}
           />
-          
+
           {/* Bottom Sheet */}
           <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl max-h-[70vh] flex flex-col animate-slide-up">
             <WaitingListSidebar
@@ -466,15 +493,15 @@ export default function StaffCalendarView({
         onUpdate={refetch}
         isAdmin={isAdmin}
       />
-      
+
       {/* Drag Overlay */}
       {dragState.isDragging && dragState.draggedAppointment && (
-        <div 
+        <div
           className="fixed z-50 pointer-events-none p-3 bg-white rounded-lg shadow-xl border border-primary-200 opacity-90 w-48 animate-pulse"
           style={{
             left: dragState.dragPosition.x,
             top: dragState.dragPosition.y,
-            transform: 'translate(-50%, -50%)',
+            transform: "translate(-50%, -50%)",
           }}
         >
           <p className="font-bold text-sm text-gray-900 truncate">
@@ -484,10 +511,10 @@ export default function StaffCalendarView({
             {dragState.draggedAppointment.service.name}
           </p>
           <div className="mt-1 flex items-center gap-1 text-xs text-primary-600 font-medium">
-             ⏱️ {dragState.draggedAppointment.service.duration}p
+            ⏱️ {dragState.draggedAppointment.service.duration}p
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }

@@ -1,93 +1,123 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useMemo } from 'react'
-import { Scissors, Clock, DollarSign, ChevronRight, ChevronLeft, Search, Check, CheckSquare, Square } from 'lucide-react'
-import type { Service, ServiceCategory } from '../types'
+import { useState, useEffect, useMemo } from "react";
+import {
+  Scissors,
+  Clock,
+  DollarSign,
+  ChevronRight,
+  ChevronLeft,
+  Search,
+  Check,
+  CheckSquare,
+  Square,
+} from "lucide-react";
+import type { Service, ServiceCategory } from "../types";
 
 interface Step2ServiceProps {
-  salonId: string
-  selectedServiceIds: string[]
-  onToggle: (service: Service) => void
-  onNext: () => void
-  onBack: () => void
+  salonId: string;
+  selectedServiceIds: string[];
+  onToggle: (service: Service) => void;
+  onNext: () => void;
+  onBack: () => void;
+  /**
+   * Optional callback to expose loaded services to parent components.
+   * Useful when another wizard (e.g. modal booking) needs the same
+   * service data for later steps like confirmation.
+   */
+  onServicesLoaded?: (services: Service[]) => void;
+  /**
+   * When true, hides the internal navigation buttons.
+   * This lets parent wizards render their own Back/Next controls.
+   */
+  hideNavigation?: boolean;
 }
 
-export default function Step2Service({ 
-  salonId, 
+export default function Step2Service({
+  salonId,
   selectedServiceIds = [],
-  onToggle, 
-  onNext, 
-  onBack 
+  onToggle,
+  onNext,
+  onBack,
+  onServicesLoaded,
+  hideNavigation = false,
 }: Step2ServiceProps) {
-  const [services, setServices] = useState<Service[]>([])
-  const [categories, setCategories] = useState<ServiceCategory[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null) // null = "Tất cả"
+  const [services, setServices] = useState<Service[]>([]);
+  const [categories, setCategories] = useState<ServiceCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
+    null,
+  ); // null = "Tất cả"
 
   useEffect(() => {
     if (salonId) {
-      fetchServicesAndCategories()
+      fetchServicesAndCategories();
     }
-  }, [salonId])
+  }, [salonId]);
 
   const fetchServicesAndCategories = async () => {
     try {
-      const res = await fetch(`/api/booking/services?salonId=${salonId}`)
+      const res = await fetch(`/api/booking/services?salonId=${salonId}`);
       if (res.ok) {
-        const data = await res.json()
-        setServices(data.services || [])
-        setCategories(data.categories || [])
+        const data = await res.json();
+        const loadedServices: Service[] = data.services || [];
+        setServices(loadedServices);
+        setCategories(data.categories || []);
+
+        if (onServicesLoaded) {
+          onServicesLoaded(loadedServices);
+        }
       }
     } catch (error) {
-      console.error('Error fetching services:', error)
+      console.error("Error fetching services:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // Filter services based on selected category and search term
   const filteredServices = useMemo(() => {
-    let filtered = services
+    let filtered = services;
 
     // Filter by category
     if (selectedCategoryId !== null) {
-      const category = categories.find(c => c.id === selectedCategoryId)
+      const category = categories.find((c) => c.id === selectedCategoryId);
       if (category) {
-        filtered = filtered.filter(service => 
-          category.serviceIds.includes(service.id)
-        )
+        filtered = filtered.filter((service) =>
+          category.serviceIds.includes(service.id),
+        );
       }
     }
     // If "Tất cả" (null), show all services including those without categories
 
     // Filter by search term
     if (searchTerm) {
-      filtered = filtered.filter(service =>
-        service.name.toLowerCase().includes(searchTerm.toLowerCase())
-      )
+      filtered = filtered.filter((service) =>
+        service.name.toLowerCase().includes(searchTerm.toLowerCase()),
+      );
     }
 
-    return filtered
-  }, [services, categories, selectedCategoryId, searchTerm])
+    return filtered;
+  }, [services, categories, selectedCategoryId, searchTerm]);
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('vi-VN').format(price) + 'đ'
-  }
+    return new Intl.NumberFormat("vi-VN").format(price) + "đ";
+  };
 
   const handleToggle = (service: Service) => {
-    onToggle(service)
-  }
+    onToggle(service);
+  };
 
   const handleContinue = () => {
     if (selectedServiceIds.length > 0) {
-      onNext()
+      onNext();
     }
-  }
+  };
 
   const handleCategorySelect = (categoryId: string | null) => {
-    setSelectedCategoryId(categoryId)
-  }
+    setSelectedCategoryId(categoryId);
+  };
 
   if (loading) {
     return (
@@ -97,16 +127,14 @@ export default function Step2Service({
           <p className="mt-4 text-gray-500">Đang tải danh sách dịch vụ...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Chọn Dịch vụ
-        </h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Chọn Dịch vụ</h2>
         <p className="text-gray-500">
           Chọn một hoặc nhiều dịch vụ bạn muốn sử dụng
         </p>
@@ -121,15 +149,14 @@ export default function Step2Service({
             onClick={() => handleCategorySelect(null)}
             className={`
               px-4 py-2.5 rounded-xl border-2 transition-all duration-200 flex items-center gap-2
-              ${selectedCategoryId === null
-                ? 'border-primary-400 bg-primary-50 text-primary-700 font-medium shadow-sm'
-                : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 hover:bg-gray-50'
+              ${
+                selectedCategoryId === null
+                  ? "border-primary-400 bg-primary-50 text-primary-700 font-medium shadow-sm"
+                  : "border-gray-200 bg-white text-gray-700 hover:border-primary-300 hover:bg-gray-50"
               }
             `}
           >
-            {selectedCategoryId === null && (
-              <Check className="w-4 h-4" />
-            )}
+            {selectedCategoryId === null && <Check className="w-4 h-4" />}
             <span>Tất cả</span>
           </button>
 
@@ -140,9 +167,10 @@ export default function Step2Service({
               onClick={() => handleCategorySelect(category.id)}
               className={`
                 px-4 py-2.5 rounded-xl border-2 transition-all duration-200 flex items-center gap-2
-                ${selectedCategoryId === category.id
-                  ? 'border-primary-400 bg-primary-50 text-primary-700 font-medium shadow-sm'
-                  : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 hover:bg-gray-50'
+                ${
+                  selectedCategoryId === category.id
+                    ? "border-primary-400 bg-primary-50 text-primary-700 font-medium shadow-sm"
+                    : "border-gray-200 bg-white text-gray-700 hover:border-primary-300 hover:bg-gray-50"
                 }
               `}
             >
@@ -172,10 +200,9 @@ export default function Step2Service({
       {/* Service List */}
       <div>
         <p className="text-sm font-medium text-gray-700 mb-3">
-          {selectedCategoryId === null 
-            ? 'Chọn dịch vụ' 
-            : `Dịch vụ ${categories.find(c => c.id === selectedCategoryId)?.name || ''}`
-          }
+          {selectedCategoryId === null
+            ? "Chọn dịch vụ"
+            : `Dịch vụ ${categories.find((c) => c.id === selectedCategoryId)?.name || ""}`}
         </p>
         <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
           {filteredServices.length === 0 ? (
@@ -193,26 +220,33 @@ export default function Step2Service({
             </div>
           ) : (
             filteredServices.map((service) => {
-              const isSelected = selectedServiceIds.includes(service.id)
+              const isSelected = selectedServiceIds.includes(service.id);
               return (
                 <button
                   key={service.id}
                   onClick={() => handleToggle(service)}
                   className={`
                     w-full text-left p-4 rounded-xl border-2 transition-all duration-200
-                    ${isSelected
-                      ? 'border-primary-400 bg-primary-50 shadow-md'
-                      : 'border-gray-200 bg-white hover:border-primary-300 hover:shadow-sm'
+                    ${
+                      isSelected
+                        ? "border-primary-400 bg-primary-50 shadow-md"
+                        : "border-gray-200 bg-white hover:border-primary-300 hover:shadow-sm"
                     }
                   `}
                 >
                   <div className="flex items-start gap-4">
                     {/* Checkbox Icon */}
-                    <div className={`
+                    <div
+                      className={`
                       flex-shrink-0 mt-1
-                      ${isSelected ? 'text-primary-500' : 'text-gray-300'}
-                    `}>
-                      {isSelected ? <CheckSquare className="w-6 h-6" /> : <Square className="w-6 h-6" />}
+                      ${isSelected ? "text-primary-500" : "text-gray-300"}
+                    `}
+                    >
+                      {isSelected ? (
+                        <CheckSquare className="w-6 h-6" />
+                      ) : (
+                        <Square className="w-6 h-6" />
+                      )}
                     </div>
 
                     {/* Info */}
@@ -233,36 +267,39 @@ export default function Step2Service({
                     </div>
                   </div>
                 </button>
-              )
+              );
             })
           )}
         </div>
       </div>
 
-      {/* Navigation */}
-      <div className="pt-4 border-t border-gray-200 flex gap-3">
-        <button
-          onClick={onBack}
-          className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-        >
-          <ChevronLeft className="w-5 h-5" />
-          Quay lại
-        </button>
-        <button
-          onClick={handleContinue}
-          disabled={selectedServiceIds.length === 0}
-          className={`
-            flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium transition-all
-            ${selectedServiceIds.length > 0
-              ? 'bg-primary-400 text-white hover:bg-primary-500 shadow-lg shadow-primary-400/30'
-              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            }
-          `}
-        >
-          Tiếp tục ({selectedServiceIds.length})
-          <ChevronRight className="w-5 h-5" />
-        </button>
-      </div>
+      {/* Navigation (optional, can be hidden when embedded in another wizard) */}
+      {!hideNavigation && (
+        <div className="pt-4 border-t border-gray-200 flex gap-3">
+          <button
+            onClick={onBack}
+            className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+            Quay lại
+          </button>
+          <button
+            onClick={handleContinue}
+            disabled={selectedServiceIds.length === 0}
+            className={`
+              flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium transition-all
+              ${
+                selectedServiceIds.length > 0
+                  ? "bg-primary-400 text-white hover:bg-primary-500 shadow-lg shadow-primary-400/30"
+                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+              }
+            `}
+          >
+            Tiếp tục ({selectedServiceIds.length})
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+      )}
     </div>
-  )
+  );
 }
