@@ -325,8 +325,8 @@ export default function StaffCalendarView({
             {/* Time column header spacer */}
             <div className="w-16 md:w-20 flex-shrink-0 border-r border-beige-dark bg-beige-light" />
 
-            {/* Staff column headers - full width, chia đều theo số nhân viên */}
-            <div className="flex-1 min-w-0 pb-2 flex">
+            {/* Staff column headers - reserve space for scrollbar so columns align with body */}
+            <div className="flex-1 min-w-0 pb-2 flex pr-[var(--calendar-scrollbar-width,17px)]">
               {staff.map((s) => (
                 <div
                   key={s.id}
@@ -345,7 +345,7 @@ export default function StaffCalendarView({
           <div className="flex-1 flex overflow-hidden">
             <div
               ref={scrollContainerRef}
-              className="flex-1 overflow-y-auto relative"
+              className="flex-1 overflow-y-auto relative calendar-scroll-area"
               onDrop={handleWaitingListDrop}
               onDragOver={(e) => e.preventDefault()}
             >

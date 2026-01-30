@@ -33,6 +33,11 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: -0.02em;
 }
 
+/* Calendar: reserve space for scrollbar so columns don't shift (header & body align) */
+.calendar-scroll-area {
+  scrollbar-gutter: stable;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
