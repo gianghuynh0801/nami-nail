@@ -4,7 +4,7 @@ import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz'
-import { getSalonTz } from '@/lib/timezone'
+import { DEFAULT_SALON_TIMEZONE } from '@/lib/timezone'
 
 const customerInputSchema = z.object({
   customerName: z.string().min(1),
@@ -100,11 +100,8 @@ export async function POST(request: Request) {
     const end = new Date(start.getTime() + totalDuration * 60000)
     const mainServiceId = serviceIds[0]
 
-    const salonRecord = await prisma.salon.findUnique({
-      where: { id: salonId },
-      select: { timezone: true },
-    })
-    const tz = getSalonTz(salonRecord?.timezone)
+    // Luôn dùng múi giờ Áo (Europe/Vienna) cho đặt lịch
+    const tz = DEFAULT_SALON_TIMEZONE
     const dateStr = formatInTimeZone(start, tz, 'yyyy-MM-dd')
     const dayStartUtc = fromZonedTime(`${dateStr}T00:00:00`, tz)
     const dayOfWeek = toZonedTime(dayStartUtc, tz).getDay()

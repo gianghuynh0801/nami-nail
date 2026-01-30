@@ -160,7 +160,7 @@ export default function BookingWizardModal({
           serviceIds: state.serviceIds, // Send array of IDs
           staffId: staffIdToUse,
           // Convert salon-local date/time to UTC ISO (avoid client timezone differences)
-          startTime: salonLocalToUtcISOString(state.selectedDate, state.selectedTime, state.salon?.timezone),
+          startTime: salonLocalToUtcISOString(state.selectedDate, state.selectedTime, undefined),
           notes: state.customerInfo.notes || undefined,
         }),
       })
@@ -258,7 +258,7 @@ export default function BookingWizardModal({
         return (
           <Step4DateTime
             salonId={state.salonId!}
-            salonTimezone={state.salon?.timezone}
+            salonTimezone={undefined}
             staffId={state.staffId}
             serviceIds={state.serviceIds}
             isAnyStaff={state.isAnyStaff}

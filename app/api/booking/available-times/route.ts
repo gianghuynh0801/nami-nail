@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { addMinutes } from 'date-fns'
 import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz'
-import { getSalonTz } from '@/lib/timezone'
+import { DEFAULT_SALON_TIMEZONE } from '@/lib/timezone'
 
 export async function GET(request: NextRequest) {
   try {
@@ -52,12 +52,8 @@ export async function GET(request: NextRequest) {
        totalDuration += staffService?.duration ?? service.duration
     }
 
-    // Get salon timezone (fallback to Europe/Vienna)
-    const salon = await prisma.salon.findUnique({
-      where: { id: salonId },
-      select: { timezone: true },
-    })
-    const tz = getSalonTz(salon?.timezone)
+    // Luôn dùng múi giờ Áo (Europe/Vienna) cho khung giờ đặt lịch
+    const tz = DEFAULT_SALON_TIMEZONE
 
     // Get staff schedule for the selected day in salon timezone
     const dayStartUtc = fromZonedTime(`${date}T00:00:00`, tz)

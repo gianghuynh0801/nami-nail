@@ -238,7 +238,7 @@ export default function BookingWizard({
       const startTimeISO = salonLocalToUtcISOString(
         selectedDate,
         selectedTime,
-        salon.timezone,
+        undefined,
       );
 
       const staffIdForBooking = isAnyStaff ? (staff?.length ? staff[0].id : selectedStaffId) : selectedStaffId;
@@ -360,7 +360,7 @@ export default function BookingWizard({
             serviceIds={selectedServiceIds}
             staffId={selectedStaffId}
             isAnyStaff={isAnyStaff}
-            salonTimezone={salon.timezone}
+            salonTimezone={undefined}
             selectedDate={selectedDate}
             selectedTime={selectedTime}
             onSelectDate={setSelectedDate}

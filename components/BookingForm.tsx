@@ -159,7 +159,7 @@ export default function BookingForm({ salon, services, staff }: BookingFormProps
 
     try {
       // Convert salon-local date/time to UTC ISO to avoid client timezone differences
-      const startTimeISO = salonLocalToUtcISOString(data.date, data.time, (salon as any)?.timezone)
+      const startTimeISO = salonLocalToUtcISOString(data.date, data.time, undefined)
       const startTime = new Date(startTimeISO)
       const endTime = addMinutes(startTime, selectedService.duration)
 
@@ -196,7 +196,7 @@ export default function BookingForm({ salon, services, staff }: BookingFormProps
   }
 
   // Get minimum date (today)
-  const today = salonTodayISO(salon.timezone)
+  const today = salonTodayISO(undefined)
 
   if (success) {
     return (

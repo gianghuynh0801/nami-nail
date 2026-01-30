@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { addMinutes } from 'date-fns'
 import { fromZonedTime, toZonedTime } from 'date-fns-tz'
-import { getSalonTz } from '@/lib/timezone'
+import { DEFAULT_SALON_TIMEZONE } from '@/lib/timezone'
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,12 +33,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Some services not found' }, { status: 404 })
     }
 
-    // Salon timezone
-    const salon = await prisma.salon.findUnique({
-      where: { id: salonId },
-      select: { timezone: true },
-    })
-    const tz = getSalonTz(salon?.timezone)
+    // Luôn dùng múi giờ Áo (Europe/Vienna) cho đặt lịch
+    const tz = DEFAULT_SALON_TIMEZONE
 
     // Selected datetime (salon-local) converted to UTC for DB comparisons
     const selectedDateTimeUtc = fromZonedTime(`${date}T${time}:00`, tz)
