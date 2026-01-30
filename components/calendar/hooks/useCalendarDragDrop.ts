@@ -66,13 +66,7 @@ export function useCalendarDragDrop({
       // Strategy 1: Direct Slot Detection
       const slot = element.dataset?.slot
       if (slot) {
-        // Check if slot is valid working hour
-        const isWorking = element.dataset?.working === 'true'
-        if (!isWorking) {
-           console.log('Slot found but not working hour', slot)
-           continue // Skip this element/slot
-        }
-
+        // Cho phép drop mọi ô (không giới hạn khung giờ làm việc)
         console.log('Found slot:', slot)
         const timeIndex = slot.lastIndexOf('-')
         if (timeIndex !== -1) {

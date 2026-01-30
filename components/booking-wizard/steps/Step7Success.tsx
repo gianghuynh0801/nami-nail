@@ -1,15 +1,23 @@
-'use client'
+"use client";
 
-import { useEffect } from 'react'
-import { CheckCircle, Calendar, Clock, MapPin, User, Phone, ExternalLink } from 'lucide-react'
-import { format } from 'date-fns'
-import { vi } from 'date-fns/locale'
-import type { WizardState } from '../types'
+import { useEffect } from "react";
+import {
+  CheckCircle,
+  Calendar,
+  Clock,
+  MapPin,
+  User,
+  Phone,
+  ExternalLink,
+} from "lucide-react";
+import { format } from "date-fns";
+import { vi } from "date-fns/locale";
+import type { WizardState } from "../types";
 
 interface Step7SuccessProps {
-  state: WizardState
-  onClose: () => void
-  onViewAppointment: () => void
+  state: WizardState;
+  onClose: () => void;
+  onViewAppointment: () => void;
 }
 
 export default function Step7Success({
@@ -17,19 +25,28 @@ export default function Step7Success({
   onClose,
   onViewAppointment,
 }: Step7SuccessProps) {
-  const { salon, services, staff, isAnyStaff, selectedDate, selectedTime, customerInfo, createdAppointmentId } = state
+  const {
+    salon,
+    services,
+    staff,
+    isAnyStaff,
+    selectedDate,
+    selectedTime,
+    customerInfo,
+    createdAppointmentId,
+  } = state;
 
   // Confetti effect on mount
   useEffect(() => {
     // You can add a confetti library here for celebration effect
     // For now, just a simple animation
-  }, [])
+  }, []);
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('vi-VN').format(price) + 'đ'
-  }
+    return new Intl.NumberFormat("vi-VN").format(price) + "đ";
+  };
 
-  const totalPrice = services.reduce((total, s) => total + s.price, 0)
+  const totalPrice = services.reduce((total, s) => total + s.price, 0);
 
   return (
     <div className="text-center space-y-6 py-4">
@@ -58,7 +75,10 @@ export default function Step7Success({
       {createdAppointmentId && (
         <div className="inline-block bg-gray-100 rounded-full px-4 py-2">
           <p className="text-sm text-gray-600">
-            Mã đặt lịch: <span className="font-mono font-semibold text-gray-900">#{createdAppointmentId.slice(0, 8).toUpperCase()}</span>
+            Mã đặt lịch:{" "}
+            <span className="font-mono font-semibold text-gray-900">
+              #{createdAppointmentId.slice(0, 8).toUpperCase()}
+            </span>
           </p>
         </div>
       )}
@@ -79,7 +99,9 @@ export default function Step7Success({
               </div>
               <div>
                 <p className="font-medium text-gray-900">
-                  {format(new Date(selectedDate), 'EEEE, dd/MM/yyyy', { locale: vi })}
+                  {format(new Date(selectedDate), "EEEE, dd/MM/yyyy", {
+                    locale: vi,
+                  })}
                 </p>
                 <p className="text-sm text-gray-600">Lúc {selectedTime}</p>
               </div>
@@ -99,17 +121,33 @@ export default function Step7Success({
             </div>
           )}
 
-          {/* Staff */}
+          {/* Nhân viên thực hiện */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0">
               <User className="w-5 h-5 text-primary-600" />
             </div>
-            <div>
-              <p className="font-medium text-gray-900">
-                {isAnyStaff ? 'Nhân viên sẽ được phân công' : staff?.name}
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-primary-600 uppercase tracking-wide mb-1">
+                Nhân viên thực hiện
               </p>
-              <div className="text-sm text-gray-600">
-                {services.map(s => s.name).join(', ')}
+              {isAnyStaff ? (
+                <p className="font-medium text-gray-900">
+                  Hệ thống sẽ phân công nhân viên phù hợp
+                </p>
+              ) : staff ? (
+                <>
+                  <p className="font-medium text-gray-900">{staff.name}</p>
+                  {staff.phone && (
+                    <p className="text-sm text-gray-600 mt-0.5">
+                      Liên hệ:{" "}
+                      <span className="font-medium">{staff.phone}</span>
+                    </p>
+                  )}
+                </>
+              ) : null}
+              <div className="text-sm text-gray-600 mt-1.5">
+                <span className="font-medium text-gray-700">Dịch vụ: </span>
+                {services.map((s) => s.name).join(", ")}
               </div>
             </div>
           </div>
@@ -119,7 +157,9 @@ export default function Step7Success({
             <div className="pt-3 mt-3 border-t border-primary-200">
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Tổng thanh toán</span>
-                <span className="text-xl font-bold text-primary-600">{formatPrice(totalPrice)}</span>
+                <span className="text-xl font-bold text-primary-600">
+                  {formatPrice(totalPrice)}
+                </span>
               </div>
             </div>
           )}
@@ -131,7 +171,8 @@ export default function Step7Success({
         <div className="flex items-center gap-2 text-blue-700">
           <Phone className="w-5 h-5" />
           <p className="text-sm">
-            Xác nhận sẽ được gửi đến <span className="font-semibold">{customerInfo.phone}</span>
+            Xác nhận sẽ được gửi đến{" "}
+            <span className="font-semibold">{customerInfo.phone}</span>
           </p>
         </div>
       </div>
@@ -159,5 +200,5 @@ export default function Step7Success({
         💡 Bạn có thể xem và quản lý lịch hẹn trong trang Dashboard
       </p>
     </div>
-  )
+  );
 }

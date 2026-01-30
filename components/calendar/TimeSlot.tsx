@@ -30,22 +30,19 @@ export default function TimeSlot({
   // onClick is for direct click to create appointment
 
   const handleTouchEnd = useCallback(() => {
-    if (isWorking && !isBreak && !isPast) {
-      onDrop(staffId, time)
-    }
-  }, [staffId, time, isWorking, isBreak, isPast, onDrop])
+    if (!isPast) onDrop(staffId, time)
+  }, [staffId, time, isPast, onDrop])
 
   const handleClick = useCallback((e: React.MouseEvent) => {
-    // Handle direct click to create appointment
-    if (isWorking && !isBreak && !isPast && onClick) {
+    if (!isPast && onClick) {
       e.stopPropagation()
       e.preventDefault()
       onClick(staffId, time)
     }
-  }, [staffId, time, isWorking, isBreak, isPast, onClick])
+  }, [staffId, time, isPast, onClick])
 
-  // Xác định style dựa vào trạng thái
-  const isClickable = isWorking && !isBreak && !isPast && onClick
+  // Cho phép click/drop mọi ô không trong quá khứ (không giới hạn khung giờ làm việc)
+  const isClickable = !isPast && !!onClick
 
   return (
     <div
@@ -65,7 +62,7 @@ export default function TimeSlot({
         zIndex: isClickable ? 15 : 1,
         pointerEvents: 'auto',
       }}
-      data-working={isWorking && !isBreak && !isPast}
+      data-working={!isPast}
       onTouchEnd={handleTouchEnd}
       onClick={handleClick}
       data-slot={`${staffId}-${time}`}

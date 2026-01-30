@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { format, addDays, subDays } from "date-fns";
 import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import CalendarHeader from "./CalendarHeader";
@@ -8,7 +8,6 @@ import TimeColumn from "./TimeColumn";
 import StaffColumn from "./StaffColumn";
 import StaffColumnHeader from "./StaffColumnHeader";
 import WaitingListSidebar from "./WaitingListSidebar";
-import QueueList from "./QueueList";
 import NotificationCenter from "./NotificationCenter";
 import CurrentTimeLine from "./CurrentTimeLine";
 import AppointmentDetailModal from "./AppointmentDetailModal";
@@ -16,8 +15,6 @@ import AppointmentDetailModal from "./AppointmentDetailModal";
 import { useCalendarData } from "./hooks/useCalendarData";
 import { useCalendarDragDrop } from "./hooks/useCalendarDragDrop";
 import { useAutoScroll } from "./hooks/useAutoScroll";
-import { CALENDAR_CONFIG } from "./constants";
-import { checkWorkingHour } from "./utils";
 import type { CalendarAppointment, WaitingAppointment } from "./types";
 
 interface StaffCalendarViewProps {
@@ -26,6 +23,8 @@ interface StaffCalendarViewProps {
   onAppointmentClick?: (appointment: CalendarAppointment) => void;
   onTimeSlotClick?: (staffId: string, time: string, date: Date) => void;
   isAdmin?: boolean;
+  /** Tăng giá trị sau khi đặt lịch thành công để calendar tự refetch, không cần F5 */
+  refreshTrigger?: number;
 }
 
 export default function StaffCalendarView({
@@ -34,6 +33,7 @@ export default function StaffCalendarView({
   onAppointmentClick,
   onTimeSlotClick,
   isAdmin = false,
+  refreshTrigger = 0,
 }: StaffCalendarViewProps) {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showWaitingList, setShowWaitingList] = useState(true);
@@ -42,11 +42,6 @@ export default function StaffCalendarView({
     useState<CalendarAppointment | null>(null);
   const [selectedStaffName, setSelectedStaffName] = useState("");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const staffScrollRef = useRef<HTMLDivElement>(null);
-  const headerScrollRef = useRef<HTMLDivElement>(null);
-  const isPanningRef = useRef(false);
-  const panStartXRef = useRef(0);
-  const panStartScrollLeftRef = useRef(0);
 
   const {
     staff,
@@ -57,6 +52,11 @@ export default function StaffCalendarView({
     moveAppointment,
     assignFromWaitingList,
   } = useCalendarData(salonId, selectedDate);
+
+  // Refetch khi đặt lịch thành công (parent tăng refreshTrigger)
+  useEffect(() => {
+    if (refreshTrigger > 0) refetch();
+  }, [refreshTrigger, refetch]);
 
   const {
     dragState,
@@ -69,11 +69,8 @@ export default function StaffCalendarView({
     onMoveAppointment: async (appointmentId, newStaffId, newStartTime) => {
       await moveAppointment(appointmentId, newStaffId, newStartTime);
     },
-    validateDrop: (staffId, time) => {
-      const staffMember = staff.find((s) => s.id === staffId);
-      if (!staffMember) return false;
-      const [hour, minute] = time.split(":").map(Number);
-      return checkWorkingHour(staffMember, hour, minute) === "working";
+    validateDrop: (staffId) => {
+      return staff.some((s) => s.id === staffId);
     },
   });
 
@@ -95,61 +92,6 @@ export default function StaffCalendarView({
 
   const isToday =
     format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
-
-  // Sync horizontal scroll between header and body
-  const handleBodyScroll = useCallback(() => {
-    if (staffScrollRef.current && headerScrollRef.current) {
-      headerScrollRef.current.scrollLeft = staffScrollRef.current.scrollLeft;
-    }
-  }, []);
-
-  const handleHeaderScroll = useCallback(() => {
-    if (staffScrollRef.current && headerScrollRef.current) {
-      staffScrollRef.current.scrollLeft = headerScrollRef.current.scrollLeft;
-    }
-  }, []);
-
-  const startHorizontalPan = useCallback(
-    (e: React.PointerEvent, target: "header" | "body") => {
-      // Only pan for primary click / touch contact
-      if (e.pointerType === "mouse" && e.button !== 0) return;
-
-      const el =
-        target === "header" ? headerScrollRef.current : staffScrollRef.current;
-      if (!el) return;
-
-      isPanningRef.current = true;
-      panStartXRef.current = e.clientX;
-      panStartScrollLeftRef.current = el.scrollLeft;
-
-      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-    },
-    [],
-  );
-
-  const moveHorizontalPan = useCallback(
-    (e: React.PointerEvent, target: "header" | "body") => {
-      if (!isPanningRef.current) return;
-
-      const el =
-        target === "header" ? headerScrollRef.current : staffScrollRef.current;
-      if (!el) return;
-
-      const dx = e.clientX - panStartXRef.current;
-      el.scrollLeft = panStartScrollLeftRef.current - dx;
-
-      // Keep header/body in sync
-      if (target === "body") handleBodyScroll();
-      else handleHeaderScroll();
-    },
-    [handleBodyScroll, handleHeaderScroll],
-  );
-
-  const endHorizontalPan = useCallback((e: React.PointerEvent) => {
-    if (!isPanningRef.current) return;
-    isPanningRef.current = false;
-    (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
-  }, []);
 
   // Handle assign from waiting list
   const handleAssignFromWaitingList = useCallback(
@@ -248,10 +190,14 @@ export default function StaffCalendarView({
     async (appointmentId: string) => {
       try {
         const res = await fetch(`/api/appointments/${appointmentId}`, {
-          method: "DELETE",
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "CANCELLED" }),
         });
-        if (!res.ok) throw new Error("Failed to cancel appointment");
-        // Refresh data after canceling
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to cancel appointment");
+        }
         refetch();
       } catch (error) {
         console.error("Error canceling appointment:", error);
@@ -379,28 +325,16 @@ export default function StaffCalendarView({
             {/* Time column header spacer */}
             <div className="w-16 md:w-20 flex-shrink-0 border-r border-beige-dark bg-beige-light" />
 
-            {/* Staff column headers - horizontal scroll */}
-            <div
-              ref={headerScrollRef}
-              className="flex-1 overflow-x-auto pb-2"
-              onScroll={handleHeaderScroll}
-              onPointerDown={(e) => startHorizontalPan(e, "header")}
-              onPointerMove={(e) => moveHorizontalPan(e, "header")}
-              onPointerUp={endHorizontalPan}
-              onPointerCancel={endHorizontalPan}
-              style={{ cursor: "grab", touchAction: "pan-y" }}
-            >
-              <div className="flex" style={{ width: "fit-content" }}>
-                {staff.map((s) => (
-                  <div
-                    key={s.id}
-                    className="flex-shrink-0 border-r border-beige-dark"
-                    style={{ width: CALENDAR_CONFIG.COLUMN_MIN_WIDTH }}
-                  >
-                    <StaffColumnHeader staff={s} />
-                  </div>
-                ))}
-              </div>
+            {/* Staff column headers - full width, chia đều theo số nhân viên */}
+            <div className="flex-1 min-w-0 pb-2 flex">
+              {staff.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex-1 min-w-0 border-r border-beige-dark"
+                >
+                  <StaffColumnHeader staff={s} />
+                </div>
+              ))}
             </div>
 
             {/* Spacer for scrollbar alignment if sidebar is shown */}
@@ -419,52 +353,28 @@ export default function StaffCalendarView({
                 {/* Time Column */}
                 <TimeColumn />
 
-                {/* Staff Columns Container */}
-                <div
-                  ref={staffScrollRef}
-                  className="flex-1 overflow-x-auto pb-2"
-                  onScroll={handleBodyScroll}
-                  onPointerDown={(e) => startHorizontalPan(e, "body")}
-                  onPointerMove={(e) => moveHorizontalPan(e, "body")}
-                  onPointerUp={endHorizontalPan}
-                  onPointerCancel={endHorizontalPan}
-                  style={{ cursor: "grab", touchAction: "pan-y" }}
-                >
-                  <div
-                    className="flex relative"
-                    style={{ width: "fit-content" }}
-                  >
-                    {staff.map((s) => (
-                      <StaffColumn
-                        key={s.id}
-                        staff={s}
-                        selectedDate={selectedDate}
-                        dragState={dragState}
-                        onDragStart={handleDragStart}
-                        onDrop={handleDrop}
-                        onAppointmentClick={handleAppointmentClick}
-                        onTimeSlotClick={onTimeSlotClick}
-                      />
-                    ))}
+                {/* Staff Columns Container - full width, chia đều theo số nhân viên */}
+                <div className="flex-1 min-w-0 pb-2 flex relative">
+                  {staff.map((s) => (
+                    <StaffColumn
+                      key={s.id}
+                      staff={s}
+                      selectedDate={selectedDate}
+                      dragState={dragState}
+                      onDragStart={handleDragStart}
+                      onDrop={handleDrop}
+                      onAppointmentClick={handleAppointmentClick}
+                      onTimeSlotClick={onTimeSlotClick}
+                    />
+                  ))}
 
-                    {/* Current Time Line */}
-                    {isToday && <CurrentTimeLine staffCount={staff.length} />}
-                  </div>
+                  {/* Current Time Line */}
+                  {isToday && <CurrentTimeLine />}
                 </div>
               </div>
             </div>
 
-            {/* Queue List Sidebar (desktop) - for checked-in customers */}
-            {checkedInAppointments.length > 0 && (
-              <div className="hidden lg:block flex-shrink-0">
-                <QueueList
-                  appointments={checkedInAppointments}
-                  onStart={handleStartAppointment}
-                />
-              </div>
-            )}
-
-            {/* Waiting List Sidebar (desktop) - for pending appointments */}
+            {/* Một bảng "Danh sách chờ" duy nhất: đã check-in + chờ xác nhận */}
             {showWaitingList && (
               <div className="hidden lg:block flex-shrink-0">
                 <WaitingListSidebar
@@ -472,6 +382,8 @@ export default function StaffCalendarView({
                   staff={staff}
                   onAssign={handleAssignFromWaitingList}
                   onClose={() => setShowWaitingList(false)}
+                  checkedInAppointments={checkedInAppointments}
+                  onStartAppointment={handleStartAppointment}
                 />
               </div>
             )}
@@ -482,11 +394,10 @@ export default function StaffCalendarView({
       {/* Drag Overlay */}
       {dragState.isDragging && dragState.draggedAppointment && (
         <div
-          className="fixed pointer-events-none z-50"
+          className="fixed pointer-events-none z-50 w-40"
           style={{
             left: dragState.dragPosition.x - 80,
             top: dragState.dragPosition.y - 20,
-            width: CALENDAR_CONFIG.COLUMN_MIN_WIDTH - 16,
           }}
         >
           <div className="bg-primary-400 text-white rounded-lg p-2 shadow-xl opacity-90 border-2 border-primary-500">

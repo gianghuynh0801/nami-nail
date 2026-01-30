@@ -1,37 +1,53 @@
-'use client'
+"use client";
 
-import { useSession, signOut } from 'next-auth/react'
-import { Bell, User, LogOut, Menu, Plus, ChevronDown, Building2 } from 'lucide-react'
-import { format } from 'date-fns'
-import { useState, useEffect } from 'react'
-import { BookingWizardModal } from '@/components/booking-wizard'
-import { useSalonContext } from '@/contexts/SalonContext'
+import { useSession, signOut } from "next-auth/react";
+import {
+  Bell,
+  User,
+  LogOut,
+  Menu,
+  Plus,
+  ChevronDown,
+  Building2,
+} from "lucide-react";
+import { format } from "date-fns";
+import { useState, useEffect } from "react";
+import { BookingWizardModal } from "@/components/booking-wizard";
+import { useSalonContext } from "@/contexts/SalonContext";
 
 interface TopBarProps {
-  onMenuClick: () => void
+  onMenuClick: () => void;
 }
 
 export default function TopBar({ onMenuClick }: TopBarProps) {
-  const { data: session } = useSession()
-  const { salons, selectedSalonId, selectedSalon, setSelectedSalonId, loading: salonsLoading } = useSalonContext()
-  const [currentTime, setCurrentTime] = useState<Date | null>(null)
-  const [showBookingWizard, setShowBookingWizard] = useState(false)
-  const [isMounted, setIsMounted] = useState(false)
-  const [showSalonDropdown, setShowSalonDropdown] = useState(false)
+  const { data: session } = useSession();
+  const {
+    salons,
+    selectedSalonId,
+    selectedSalon,
+    setSelectedSalonId,
+    loading: salonsLoading,
+  } = useSalonContext();
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
+  const [showBookingWizard, setShowBookingWizard] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [showSalonDropdown, setShowSalonDropdown] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true)
-    setCurrentTime(new Date())
-    
+    setIsMounted(true);
+    setCurrentTime(new Date());
+
     const timer = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 1000)
+      setCurrentTime(new Date());
+    }, 1000);
 
-    return () => clearInterval(timer)
-  }, [])
+    return () => clearInterval(timer);
+  }, []);
 
-  const time = currentTime ? format(currentTime, 'HH:mm') : '--:--'
-  const date = currentTime ? format(currentTime, 'MMM dd, yyyy') : '-- --, ----'
+  const time = currentTime ? format(currentTime, "HH:mm") : "--:--";
+  const date = currentTime
+    ? format(currentTime, "MMM dd, yyyy")
+    : "-- --, ----";
 
   return (
     <>
@@ -45,33 +61,32 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
           <Menu className="w-6 h-6 text-gray-600" />
         </button>
 
-        {/* Left side: Title + Salon Selector */}
-        <div className="flex items-center gap-4 flex-1 lg:flex-initial">
-          {/* Title */}
-          <div className="text-base lg:text-lg font-playfair font-semibold text-primary-600">
-            <span className="hidden sm:inline">NAMI Nail Management</span>
-            <span className="sm:hidden">NAMI</span>
-          </div>
-
-          {/* Salon Selector Dropdown */}
-          {salons.length > 0 && (
-            <div className="relative hidden md:block">
+        {/* Left: Brand + Chi nhánh gộp thành 1 dropdown */}
+        <div className="flex-1 lg:flex-initial min-w-0">
+          {salons.length > 0 ? (
+            <div className="relative inline-block">
               <button
                 onClick={() => setShowSalonDropdown(!showSalonDropdown)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors text-sm"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50/80 hover:bg-gray-100 transition-colors text-left min-w-0 max-w-full sm:max-w-[280px]"
               >
-                <Building2 className="w-4 h-4 text-primary-500" />
-                <span className="max-w-[150px] truncate text-gray-700 font-medium">
-                  {selectedSalon?.name || 'Chọn chi nhánh'}
+                <span className="text-base lg:text-lg font-playfair font-semibold text-primary-600 flex-shrink-0">
+                  NAMI
                 </span>
-                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showSalonDropdown ? 'rotate-180' : ''}`} />
+                <span className="hidden sm:inline text-gray-400 flex-shrink-0">
+                  ·
+                </span>
+                <span className="truncate text-sm font-medium text-gray-700 flex-1 min-w-0">
+                  {selectedSalon?.name || "Chọn chi nhánh"}
+                </span>
+                <ChevronDown
+                  className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${showSalonDropdown ? "rotate-180" : ""}`}
+                />
               </button>
-              
-              {/* Dropdown menu */}
+
               {showSalonDropdown && (
                 <>
-                  <div 
-                    className="fixed inset-0 z-10" 
+                  <div
+                    className="fixed inset-0 z-10"
                     onClick={() => setShowSalonDropdown(false)}
                   />
                   <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
@@ -82,23 +97,33 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
                       <button
                         key={salon.id}
                         onClick={() => {
-                          setSelectedSalonId(salon.id)
-                          setShowSalonDropdown(false)
+                          setSelectedSalonId(salon.id);
+                          setShowSalonDropdown(false);
                         }}
                         className={`w-full text-left px-3 py-2 text-sm hover:bg-primary-50 transition-colors flex items-center gap-2 ${
-                          salon.id === selectedSalonId ? 'bg-primary-50 text-primary-700' : 'text-gray-700'
+                          salon.id === selectedSalonId
+                            ? "bg-primary-50 text-primary-700"
+                            : "text-gray-700"
                         }`}
                       >
-                        <Building2 className={`w-4 h-4 ${salon.id === selectedSalonId ? 'text-primary-500' : 'text-gray-400'}`} />
-                        <div>
-                          <p className="font-medium">{salon.name}</p>
-                          <p className="text-xs text-gray-500 truncate">{salon.address}</p>
+                        <Building2
+                          className={`w-4 h-4 flex-shrink-0 ${salon.id === selectedSalonId ? "text-primary-500" : "text-gray-400"}`}
+                        />
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{salon.name}</p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {salon.address}
+                          </p>
                         </div>
                       </button>
                     ))}
                   </div>
                 </>
               )}
+            </div>
+          ) : (
+            <div className="text-base lg:text-lg font-playfair font-semibold text-primary-600">
+              NAMI Nail Management
             </div>
           )}
         </div>
@@ -115,34 +140,36 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
           </button>
 
           {/* Time - hidden on small mobile */}
-          <div 
+          <div
             className="hidden md:block text-gray-700 font-medium text-sm"
             suppressHydrationWarning
           >
             {time}
           </div>
-          
+
           {/* Date - hidden on mobile */}
-          <div 
+          <div
             className="hidden lg:block text-gray-500 text-sm"
             suppressHydrationWarning
           >
             {date}
           </div>
-          
+
           {/* Bell Icon */}
           <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <Bell className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600" />
           </button>
-          
+
           {/* User */}
           <div className="flex items-center gap-2 lg:gap-3">
-            <span className="hidden md:block text-gray-700 font-medium text-sm">{session?.user?.name || 'User'}</span>
+            <span className="hidden md:block text-gray-700 font-medium text-sm">
+              {session?.user?.name || "User"}
+            </span>
             <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-full bg-gradient-to-br from-primary-400 to-primary-500 flex items-center justify-center">
               <User className="w-3 h-3 lg:w-4 lg:h-4 text-white" />
             </div>
             <button
-              onClick={() => signOut({ callbackUrl: '/' })}
+              onClick={() => signOut({ callbackUrl: "/" })}
               className="p-2 hover:bg-beige-light rounded-lg transition-colors"
               title="Logout"
             >
@@ -158,10 +185,9 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
         onClose={() => setShowBookingWizard(false)}
         initialSalonId={selectedSalonId || undefined}
         onSuccess={(appointmentId) => {
-          console.log('Booking created from TopBar:', appointmentId)
+          console.log("Booking created from TopBar:", appointmentId);
         }}
       />
     </>
-  )
+  );
 }
-

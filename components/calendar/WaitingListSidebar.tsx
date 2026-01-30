@@ -1,16 +1,19 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Clock, User, GripVertical, Phone } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
+import { X, Clock, User, GripVertical, Phone, AlertCircle } from 'lucide-react'
+import { formatDistanceToNow, format, parseISO, differenceInMinutes } from 'date-fns'
 import { vi } from 'date-fns/locale'
-import type { WaitingAppointment, CalendarStaff } from './types'
+import type { WaitingAppointment, CalendarStaff, CalendarAppointment } from './types'
 
 interface WaitingListSidebarProps {
   appointments: WaitingAppointment[]
   staff: CalendarStaff[]
   onAssign: (appointment: WaitingAppointment, staffId: string, time: string) => void
   onClose: () => void
+  /** Khách đã check-in (đang chờ làm) - gộp chung 1 bảng */
+  checkedInAppointments?: CalendarAppointment[]
+  onStartAppointment?: (appointmentId: string) => void
 }
 
 export default function WaitingListSidebar({
@@ -18,9 +21,13 @@ export default function WaitingListSidebar({
   staff,
   onAssign,
   onClose,
+  checkedInAppointments = [],
+  onStartAppointment,
 }: WaitingListSidebarProps) {
   const [selectedAppointment, setSelectedAppointment] = useState<string | null>(null)
   const [draggedAppointment, setDraggedAppointment] = useState<string | null>(null)
+
+  const totalWaiting = checkedInAppointments.length + appointments.length
 
   const handleDragStart = (e: React.DragEvent, appointmentId: string) => {
     e.dataTransfer.setData('appointmentId', appointmentId)
@@ -57,7 +64,7 @@ export default function WaitingListSidebar({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-gray-900">Danh sách chờ</h3>
-            <p className="text-sm text-gray-500">{appointments.length} khách đang chờ</p>
+            <p className="text-sm text-gray-500">{totalWaiting} khách đang chờ</p>
           </div>
           <button
             onClick={onClose}
@@ -70,7 +77,72 @@ export default function WaitingListSidebar({
 
       {/* List */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {appointments.length === 0 ? (
+        {/* Phần 1: Đã check-in (đang chờ làm) */}
+        {checkedInAppointments.length > 0 && (
+          <>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide px-1 mb-2">
+              Đã check-in ({checkedInAppointments.length})
+            </p>
+            {checkedInAppointments.map((apt) => {
+              const checkedInAt = apt.checkedInAt ? parseISO(apt.checkedInAt) : null
+              const endTime = apt.startedAt ? parseISO(apt.startedAt) : new Date()
+              const waitingTime = checkedInAt
+                ? `${format(checkedInAt, 'HH:mm')} - ${format(endTime, 'HH:mm')}`
+                : null
+              const waitingMinutes =
+                checkedInAt && !apt.startedAt
+                  ? differenceInMinutes(new Date(), checkedInAt)
+                  : null
+              const isLongWait = waitingMinutes !== null && waitingMinutes >= 30
+
+              return (
+                <div
+                  key={apt.id}
+                  className={`
+                    p-3 rounded-lg border-2
+                    ${isLongWait ? 'border-red-400 bg-red-50' : 'border-green-200 bg-white'}
+                  `}
+                >
+                  <div className="flex items-start gap-2">
+                    {apt.queueNumber && (
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center text-sm font-bold">
+                        {apt.queueNumber}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-gray-900 truncate text-sm">{apt.customerName}</p>
+                        {isLongWait && <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />}
+                      </div>
+                      <p className="text-xs text-gray-600 truncate">{apt.service.name}</p>
+                      {waitingTime && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Clock className="w-3 h-3 text-gray-500" />
+                          <span className={`text-xs ${isLongWait ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
+                            {waitingTime}
+                            {waitingMinutes !== null && ` (${waitingMinutes}p)`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {onStartAppointment && apt.status === 'CHECKED_IN' && (
+                    <button
+                      onClick={() => onStartAppointment(apt.id)}
+                      className="mt-2 w-full px-3 py-1.5 text-xs bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors font-medium"
+                    >
+                      Bắt đầu làm
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+            <p className="text-xs text-gray-500 px-1 mt-2 mb-1">💡 Kéo thả để sắp xếp lại thứ tự</p>
+          </>
+        )}
+
+        {/* Phần 2: Chờ xác nhận / chưa gán */}
+        {appointments.length === 0 && checkedInAppointments.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
             <p className="text-sm">Không có khách đang chờ</p>
@@ -79,7 +151,13 @@ export default function WaitingListSidebar({
             </p>
           </div>
         ) : (
-          appointments.map((apt) => (
+          <>
+            {checkedInAppointments.length > 0 && (
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide px-1 mb-2 mt-3">
+                Chờ xác nhận / chưa gán ({appointments.length})
+              </p>
+            )}
+            {appointments.map((apt) => (
             <div
               key={apt.id}
               draggable
@@ -193,7 +271,8 @@ export default function WaitingListSidebar({
                 </p>
               )}
             </div>
-          ))
+          ))}
+          </>
         )}
       </div>
 

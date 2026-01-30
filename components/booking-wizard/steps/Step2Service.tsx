@@ -140,48 +140,52 @@ export default function Step2Service({
         </p>
       </div>
 
-      {/* Category Selection */}
-      <div>
-        <p className="text-sm font-medium text-gray-700 mb-3">Chọn danh mục</p>
-        <div className="flex flex-wrap gap-2">
-          {/* "Tất cả" button */}
-          <button
-            onClick={() => handleCategorySelect(null)}
-            className={`
-              px-4 py-2.5 rounded-xl border-2 transition-all duration-200 flex items-center gap-2
-              ${
-                selectedCategoryId === null
-                  ? "border-primary-400 bg-primary-50 text-primary-700 font-medium shadow-sm"
-                  : "border-gray-200 bg-white text-gray-700 hover:border-primary-300 hover:bg-gray-50"
-              }
-            `}
-          >
-            {selectedCategoryId === null && <Check className="w-4 h-4" />}
-            <span>Tất cả</span>
-          </button>
-
-          {/* Category buttons */}
-          {categories.map((category) => (
+      {/* Category Selection - Only show if categories exist */}
+      {categories.length > 0 && (
+        <div>
+          <p className="text-sm font-medium text-gray-700 mb-3">
+            Chọn danh mục
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {/* "Tất cả" button */}
             <button
-              key={category.id}
-              onClick={() => handleCategorySelect(category.id)}
+              onClick={() => handleCategorySelect(null)}
               className={`
                 px-4 py-2.5 rounded-xl border-2 transition-all duration-200 flex items-center gap-2
                 ${
-                  selectedCategoryId === category.id
+                  selectedCategoryId === null
                     ? "border-primary-400 bg-primary-50 text-primary-700 font-medium shadow-sm"
                     : "border-gray-200 bg-white text-gray-700 hover:border-primary-300 hover:bg-gray-50"
                 }
               `}
             >
-              {selectedCategoryId === category.id && (
-                <Check className="w-4 h-4" />
-              )}
-              <span>{category.name}</span>
+              {selectedCategoryId === null && <Check className="w-4 h-4" />}
+              <span>Tất cả</span>
             </button>
-          ))}
+
+            {/* Category buttons */}
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                onClick={() => handleCategorySelect(category.id)}
+                className={`
+                  px-4 py-2.5 rounded-xl border-2 transition-all duration-200 flex items-center gap-2
+                  ${
+                    selectedCategoryId === category.id
+                      ? "border-primary-400 bg-primary-50 text-primary-700 font-medium shadow-sm"
+                      : "border-gray-200 bg-white text-gray-700 hover:border-primary-300 hover:bg-gray-50"
+                  }
+                `}
+              >
+                {selectedCategoryId === category.id && (
+                  <Check className="w-4 h-4" />
+                )}
+                <span>{category.name}</span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Search */}
       {services.length > 5 && (

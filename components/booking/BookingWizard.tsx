@@ -110,6 +110,7 @@ export default function BookingWizard({
   const [staff, setStaff] = useState<Staff[]>(initialStaff || []);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [selectedStaffId, setSelectedStaffId] = useState<string>("");
+  const [isAnyStaff, setIsAnyStaff] = useState<boolean>(false);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [customerInfo, setCustomerInfo] = useState({
@@ -150,7 +151,7 @@ export default function BookingWizard({
       case "service":
         return selectedServiceIds.length > 0;
       case "staff":
-        return !!selectedStaffId;
+        return !!selectedStaffId || isAnyStaff;
       case "datetime":
         return !!selectedDate && !!selectedTime;
       case "customer":
@@ -242,7 +243,7 @@ export default function BookingWizard({
           customerName: customerInfo.name,
           customerPhone: customerInfo.phone,
           serviceIds: selectedServiceIds,
-          staffId: selectedStaffId,
+          staffId: isAnyStaff ? null : selectedStaffId,
           startTime: startTimeISO,
         }),
       });
@@ -316,7 +317,11 @@ export default function BookingWizard({
             serviceIds={selectedServiceIds}
             staff={staff}
             selectedStaffId={selectedStaffId}
-            onSelect={setSelectedStaffId}
+            isAnyStaff={isAnyStaff}
+            onSelect={(staffId, isAnyStaffValue) => {
+              setSelectedStaffId(staffId);
+              setIsAnyStaff(isAnyStaffValue || false);
+            }}
           />
         );
       case "datetime":
@@ -332,6 +337,7 @@ export default function BookingWizard({
             salonId={salon.id}
             serviceIds={selectedServiceIds}
             staffId={selectedStaffId}
+            isAnyStaff={isAnyStaff}
             salonTimezone={salon.timezone}
             selectedDate={selectedDate}
             selectedTime={selectedTime}
