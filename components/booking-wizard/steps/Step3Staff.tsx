@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { User, Shuffle, Star, ChevronRight, ChevronLeft } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import type { Staff } from '../types'
 
 interface Step3StaffProps {
@@ -29,6 +30,7 @@ export default function Step3Staff({
   onNext, 
   onBack 
 }: Step3StaffProps) {
+  const t = useTranslations('BookingWizard')
   const [staffList, setStaffList] = useState<Staff[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -76,7 +78,7 @@ export default function Step3Staff({
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-400 mx-auto" />
-          <p className="mt-4 text-gray-500">Đang tải danh sách nhân viên...</p>
+          <p className="mt-4 text-gray-500">{t('loadingStaff')}</p>
         </div>
       </div>
     )
@@ -87,10 +89,10 @@ export default function Step3Staff({
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Chọn Nhân viên
+          {t('selectStaff')}
         </h2>
         <p className="text-gray-500">
-          Chọn nhân viên phục vụ hoặc để hệ thống tự động phân công
+          {t('selectStaffHint')}
         </p>
       </div>
 
@@ -117,10 +119,10 @@ export default function Step3Staff({
           {/* Info */}
           <div className="flex-1">
             <h3 className="font-semibold text-gray-900">
-              Bất kỳ nhân viên
+              {t('anyStaffLabel')}
             </h3>
             <p className="text-sm text-gray-500">
-              Hệ thống sẽ tự động chọn nhân viên phù hợp nhất
+              {t('anyStaffDesc')}
             </p>
           </div>
 
@@ -138,7 +140,7 @@ export default function Step3Staff({
       {/* Divider */}
       <div className="flex items-center gap-4">
         <div className="flex-1 h-px bg-gray-200" />
-        <span className="text-sm text-gray-400">hoặc chọn nhân viên</span>
+        <span className="text-sm text-gray-400">{t('orChooseStaff')}</span>
         <div className="flex-1 h-px bg-gray-200" />
       </div>
 
@@ -147,7 +149,7 @@ export default function Step3Staff({
         {staffList.length === 0 ? (
           <div className="col-span-full text-center py-8 text-gray-500">
             <User className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p>Không có nhân viên</p>
+            <p>{t('noStaff')}</p>
           </div>
         ) : (
           staffList.map((staff) => (
@@ -203,7 +205,7 @@ export default function Step3Staff({
           className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
         >
           <ChevronLeft className="w-5 h-5" />
-          Quay lại
+          {t('back')}
         </button>
         <button
           onClick={handleContinue}
@@ -216,7 +218,7 @@ export default function Step3Staff({
             }
           `}
         >
-          Tiếp tục
+          {t('continue')}
           <ChevronRight className="w-5 h-5" />
         </button>
       </div>

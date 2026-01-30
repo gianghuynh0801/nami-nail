@@ -3,12 +3,21 @@ import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
+import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz'
+import { getSalonTz } from '@/lib/timezone'
 
-const bookingSchema = z.object({
-  salonId: z.string(),
+const customerInputSchema = z.object({
   customerName: z.string().min(1),
   customerPhone: z.string().min(1),
   customerEmail: z.string().email().optional().or(z.literal('')),
+})
+
+const bookingSchema = z.object({
+  salonId: z.string(),
+  customerName: z.string().min(1).optional(),
+  customerPhone: z.string().min(1).optional(),
+  customerEmail: z.string().email().optional().or(z.literal('')),
+  customers: z.array(customerInputSchema).optional(),
   serviceIds: z.array(z.string()).min(1),
   staffId: z.string(),
   startTime: z.string(),
@@ -18,11 +27,26 @@ const bookingSchema = z.object({
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { salonId, customerName, customerPhone, customerEmail, serviceIds, staffId, startTime, notes } =
-      bookingSchema.parse(body)
-    
-    // Normalize email - convert empty string to undefined
-    const normalizedEmail = customerEmail && customerEmail.trim() !== '' ? customerEmail.trim() : undefined
+    const parsed = bookingSchema.parse(body)
+    const { salonId, serviceIds, startTime, notes } = parsed
+
+    const useMultiple = Array.isArray(parsed.customers) && parsed.customers.length > 1
+    const customerList = useMultiple
+      ? parsed.customers!
+      : [{
+          customerName: parsed.customerName ?? '',
+          customerPhone: parsed.customerPhone ?? '',
+          customerEmail: parsed.customerEmail ?? '',
+        }]
+
+    if (customerList.length === 0 || customerList.some((c) => !c.customerName?.trim() || !c.customerPhone?.trim())) {
+      return NextResponse.json(
+        { error: 'Vui lòng nhập tên và số điện thoại cho tất cả khách hàng.' },
+        { status: 400 }
+      )
+    }
+
+    const staffId = parsed.staffId
 
     // Validate and parse startTime
     const start = new Date(startTime)
@@ -41,47 +65,9 @@ export async function POST(request: Request) {
       )
     }
 
-    // Tìm hoặc tạo Customer
-    let customer = await prisma.customer.findUnique({
-      where: { phone: customerPhone },
-    })
-
-    if (!customer) {
-      // Tạo User cho customer (nếu chưa có)
-      let user = await prisma.user.findUnique({
-        where: { phone: customerPhone },
-      })
-
-      if (!user) {
-        // Tạo password mặc định (có thể gửi SMS sau)
-        const defaultPassword = await bcrypt.hash(customerPhone.slice(-6), 10)
-        user = await prisma.user.create({
-          data: {
-            name: customerName,
-            phone: customerPhone,
-            email: normalizedEmail,
-            password: defaultPassword,
-            role: 'CUSTOMER',
-          },
-        })
-      }
-
-      // Tạo Customer
-      customer = await prisma.customer.create({
-        data: {
-          userId: user.id,
-          name: customerName,
-          phone: customerPhone,
-          email: normalizedEmail,
-        },
-      })
-    }
-
-    // Fetch all services
     const services = await prisma.service.findMany({
-      where: { id: { in: serviceIds } }
+      where: { id: { in: serviceIds } },
     })
-
     if (services.length !== serviceIds.length) {
       return NextResponse.json(
         { error: 'Một số dịch vụ không tồn tại' },
@@ -89,106 +75,186 @@ export async function POST(request: Request) {
       )
     }
 
-    // Calculate total duration considering staff overrides
-    let totalDuration = 0
-    // Use any[] to avoid build errors if Prisma types are not fully synchronized yet
-    const appointmentItemsData: any[] = []
-
-    for (const service of services) {
-      // Lấy duration riêng của thợ cho dịch vụ này (nếu có)
-      const staffService = await prisma.staffService.findUnique({
-        where: {
-          staffId_serviceId: {
-            staffId,
-            serviceId: service.id,
+    const buildAppointmentItems = async (staffIdForDuration: string) => {
+      let totalDuration = 0
+      const items: any[] = []
+      for (const service of services) {
+        const staffService = await prisma.staffService.findUnique({
+          where: {
+            staffId_serviceId: { staffId: staffIdForDuration, serviceId: service.id },
           },
-        },
-      })
-
-      const duration = staffService?.duration ?? service.duration
-      totalDuration += duration
-
-      appointmentItemsData.push({
-        serviceId: service.id,
-        serviceName: service.name,
-        servicePrice: service.price, // Snapshot price
-        serviceDuration: duration,   // Snapshot duration
-        // Không cần appointmentId - Prisma tự điền khi dùng nested write
-      })
+        })
+        const duration = staffService?.duration ?? service.duration
+        totalDuration += duration
+        items.push({
+          serviceId: service.id,
+          serviceName: service.name,
+          servicePrice: service.price,
+          serviceDuration: duration,
+        })
+      }
+      return { totalDuration, items }
     }
 
+    const { totalDuration, items: appointmentItemsData } = await buildAppointmentItems(staffId)
     const end = new Date(start.getTime() + totalDuration * 60000)
-
-    // Check for overlapping appointments
-    const overlapping = await prisma.appointment.findFirst({
-      where: {
-        staffId,
-        salonId,
-        status: {
-          not: 'CANCELLED',
-        },
-        OR: [
-          {
-            AND: [
-              { startTime: { lte: start } },
-              { endTime: { gt: start } },
-            ],
-          },
-          {
-            AND: [
-              { startTime: { lt: end } },
-              { endTime: { gte: end } },
-            ],
-          },
-          {
-            AND: [
-              { startTime: { gte: start } },
-              { endTime: { lte: end } },
-            ],
-          },
-        ],
-      },
-    })
-
-    if (overlapping) {
-      return NextResponse.json(
-        { error: 'Thời gian này đã được đặt. Vui lòng chọn thời gian khác.' },
-        { status: 400 }
-      )
-    }
-
-    // Transaction to create appointment and items
-    // Since we are using Prisma's nested writes, we can do it in one go (mostly)
-    // But appointmentServiceItems relation needs to be created.
-    
-    // Use the first serviceId for the main record (backward compatibility or main service)
     const mainServiceId = serviceIds[0]
 
-    const appointment = await prisma.appointment.create({
-      data: {
-        customerId: customer.id,
-        salonId,
-        customerName,
-        customerPhone,
-        serviceId: mainServiceId,
-        staffId,
-        startTime: start,
-        endTime: end,
-        status: 'CONFIRMED',
-        notes: notes || undefined,
-        appointmentServiceItems: {
-          create: appointmentItemsData
-        }
-      } as any, // Cast to any to bypass stale types
-      include: {
-        service: true,
-        staff: true,
-        salon: true,
-        appointmentServiceItems: true,
-      } as any,
+    const salonRecord = await prisma.salon.findUnique({
+      where: { id: salonId },
+      select: { timezone: true },
     })
+    const tz = getSalonTz(salonRecord?.timezone)
+    const dateStr = formatInTimeZone(start, tz, 'yyyy-MM-dd')
+    const dayStartUtc = fromZonedTime(`${dateStr}T00:00:00`, tz)
+    const dayOfWeek = toZonedTime(dayStartUtc, tz).getDay()
 
-    return NextResponse.json({ appointment }, { status: 201 })
+    const findAvailableStaff = async (excludeStaffIds: string[]) => {
+      const all = await prisma.staff.findMany({
+        where: { salonId, id: { notIn: excludeStaffIds } },
+        include: {
+          schedules: {
+            where: {
+              dayOfWeek,
+              OR: [{ date: null }, { date: dayStartUtc }],
+            },
+          },
+          appointments: {
+            where: {
+              status: { not: 'CANCELLED' },
+              OR: [{ startTime: { lt: end }, endTime: { gt: start } }],
+            },
+          },
+        },
+      })
+      return all.filter((staff) => {
+        if (staff.schedules.length === 0) return false
+        const hasConflict = staff.appointments.some(
+          (apt) =>
+            (start >= new Date(apt.startTime) && start < new Date(apt.endTime)) ||
+            (end > new Date(apt.startTime) && end <= new Date(apt.endTime)) ||
+            (start <= new Date(apt.startTime) && end >= new Date(apt.endTime))
+        )
+        return !hasConflict
+      })
+    }
+
+    const getOrCreateCustomer = async (
+      customerName: string,
+      customerPhone: string,
+      customerEmail: string | undefined
+    ) => {
+      const normalizedEmail =
+        customerEmail && customerEmail.trim() !== '' ? customerEmail.trim() : undefined
+      let customer = await prisma.customer.findUnique({
+        where: { phone: customerPhone },
+      })
+      if (!customer) {
+        let user = await prisma.user.findUnique({
+          where: { phone: customerPhone },
+        })
+        if (!user) {
+          const defaultPassword = await bcrypt.hash(customerPhone.slice(-6), 10)
+          user = await prisma.user.create({
+            data: {
+              name: customerName,
+              phone: customerPhone,
+              email: normalizedEmail,
+              password: defaultPassword,
+              role: 'CUSTOMER',
+            },
+          })
+        }
+        customer = await prisma.customer.create({
+          data: {
+            userId: user.id,
+            name: customerName,
+            phone: customerPhone,
+            email: normalizedEmail,
+          },
+        })
+      }
+      return customer
+    }
+
+    const usedStaffIds: string[] = []
+    const createdAppointments: any[] = []
+
+    for (let i = 0; i < customerList.length; i++) {
+      const { customerName, customerPhone, customerEmail } = customerList[i]
+      const normalizedEmail =
+        customerEmail && customerEmail.trim() !== '' ? customerEmail.trim() : undefined
+      let currentStaffId: string
+
+      if (i === 0) {
+        currentStaffId = staffId
+      } else {
+        const available = await findAvailableStaff(usedStaffIds)
+        if (available.length === 0) {
+          return NextResponse.json(
+            {
+              error: `Không đủ thợ rảnh cùng giờ cho ${customerList.length} khách. Vui lòng chọn giờ khác hoặc giảm số lượng khách.`,
+            },
+            { status: 400 }
+          )
+        }
+        currentStaffId = available[0].id
+      }
+
+      if (i === 0) {
+        const overlapping = await prisma.appointment.findFirst({
+          where: {
+            staffId,
+            salonId,
+            status: { not: 'CANCELLED' },
+            OR: [
+              { AND: [{ startTime: { lte: start } }, { endTime: { gt: start } }] },
+              { AND: [{ startTime: { lt: end } }, { endTime: { gte: end } }] },
+              { AND: [{ startTime: { gte: start } }, { endTime: { lte: end } }] },
+            ],
+          },
+        })
+        if (overlapping) {
+          return NextResponse.json(
+            { error: 'Thời gian này đã được đặt. Vui lòng chọn thời gian khác.' },
+            { status: 400 }
+          )
+        }
+      }
+
+      usedStaffIds.push(currentStaffId)
+      const customer = await getOrCreateCustomer(customerName, customerPhone, normalizedEmail)
+
+      const appointment = await prisma.appointment.create({
+        data: {
+          customerId: customer.id,
+          salonId,
+          customerName,
+          customerPhone,
+          serviceId: mainServiceId,
+          staffId: currentStaffId,
+          startTime: start,
+          endTime: end,
+          status: 'CONFIRMED',
+          notes: notes || undefined,
+          appointmentServiceItems: {
+            create: appointmentItemsData,
+          },
+        } as any,
+        include: {
+          service: true,
+          staff: true,
+          salon: true,
+          appointmentServiceItems: true,
+        } as any,
+      })
+      createdAppointments.push(appointment)
+    }
+
+    if (createdAppointments.length === 1) {
+      return NextResponse.json({ appointment: createdAppointments[0] }, { status: 201 })
+    }
+    return NextResponse.json({ appointments: createdAppointments }, { status: 201 })
   } catch (error) {
     console.error('Booking API Error:', error)
     

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { GripVertical, Clock, User, AlertCircle, Bell } from 'lucide-react'
 import { format, parseISO, differenceInMinutes } from 'date-fns'
+import { useTranslations } from 'next-intl'
 import type { CalendarAppointment } from './types'
 
 interface QueueListProps {
@@ -16,6 +17,7 @@ export default function QueueList({
   onReorder,
   onStart,
 }: QueueListProps) {
+  const t = useTranslations('Calendar')
   const [queueOrder, setQueueOrder] = useState<string[]>([])
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [longWaitNotifications, setLongWaitNotifications] = useState<Set<string>>(new Set())
@@ -112,13 +114,13 @@ export default function QueueList({
     return (
       <div className="w-72 bg-white border-l border-beige-dark flex flex-col h-full shadow-lg">
         <div className="p-4 border-b border-beige-dark bg-beige-light flex-shrink-0">
-          <h3 className="font-semibold text-gray-900">Danh sách chờ</h3>
-          <p className="text-sm text-gray-500">0 khách đang chờ</p>
+          <h3 className="font-semibold text-gray-900">{t('waitingList')}</h3>
+          <p className="text-sm text-gray-500">{t('customersWaiting', { count: 0 })}</p>
         </div>
         <div className="flex-1 flex items-center justify-center text-gray-500">
           <div className="text-center">
             <User className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">Không có khách đang chờ</p>
+            <p className="text-sm">{t('noCustomersWaiting')}</p>
           </div>
         </div>
       </div>
@@ -131,8 +133,8 @@ export default function QueueList({
       <div className="p-4 border-b border-beige-dark bg-beige-light flex-shrink-0">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-gray-900">Danh sách chờ</h3>
-            <p className="text-sm text-gray-500">{orderedAppointments.length} khách đang chờ</p>
+            <h3 className="font-semibold text-gray-900">{t('waitingList')}</h3>
+            <p className="text-sm text-gray-500">{t('customersWaiting', { count: orderedAppointments.length })}</p>
           </div>
           {longWaitNotifications.size > 0 && (
             <div className="relative">

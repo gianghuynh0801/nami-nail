@@ -38,6 +38,8 @@ interface StepConfirmationProps {
   date: string
   time: string
   customerInfo: CustomerInfo
+  guestCount?: number
+  extraCustomers?: CustomerInfo[]
   onSubmit: () => void
   loading: boolean
   error: string
@@ -50,6 +52,8 @@ export default function StepConfirmation({
   date,
   time,
   customerInfo,
+  guestCount = 1,
+  extraCustomers = [],
   onSubmit,
   loading,
   error,
@@ -154,14 +158,19 @@ export default function StepConfirmation({
             <div>
               <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2 text-sm">
                 <User className="w-4 h-4 text-primary-400" />
-                Thông tin khách hàng
+                Thông tin khách hàng {guestCount > 1 ? `(${guestCount} khách)` : ''}
               </h3>
-              <div className="space-y-1 text-xs text-gray-700">
-                <p><span className="font-medium">Họ tên:</span> {customerInfo.name}</p>
-                <p><span className="font-medium">SĐT:</span> {customerInfo.phone}</p>
-                {customerInfo.email && (
-                  <p><span className="font-medium">Email:</span> {customerInfo.email}</p>
-                )}
+              <div className="space-y-2 text-xs text-gray-700">
+                <div>
+                  <p><span className="font-medium">Khách 1:</span> {customerInfo.name} – {customerInfo.phone}</p>
+                  {customerInfo.email && <p className="text-gray-500">{customerInfo.email}</p>}
+                </div>
+                {guestCount > 1 && extraCustomers.slice(0, guestCount - 1).map((c, i) => (
+                  <div key={i}>
+                    <p><span className="font-medium">Khách {i + 2}:</span> {c.name} – {c.phone}</p>
+                    {c.email && <p className="text-gray-500">{c.email}</p>}
+                  </div>
+                ))}
               </div>
             </div>
           </div>

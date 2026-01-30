@@ -2,6 +2,7 @@
 
 import { Clock, User, Scissors, Play } from 'lucide-react'
 import { differenceInMinutes } from 'date-fns'
+import { useTranslations } from 'next-intl'
 
 interface WaitingAppointment {
   id: string
@@ -27,6 +28,7 @@ interface QueueListProps {
 }
 
 export default function QueueList({ waitingQueue, onStart }: QueueListProps) {
+  const t = useTranslations('Calendar')
   const getWaitingTime = (checkedInAt: string) => {
     const checkIn = new Date(checkedInAt)
     const now = new Date()
@@ -50,13 +52,13 @@ export default function QueueList({ waitingQueue, onStart }: QueueListProps) {
     return (
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="p-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="font-semibold text-sm text-gray-900">Danh sách chờ</h3>
-          <span className="text-xs text-gray-500">0 khách đang chờ</span>
+          <h3 className="font-semibold text-sm text-gray-900">{t('waitingList')}</h3>
+          <span className="text-xs text-gray-500">{t('customersWaiting', { count: 0 })}</span>
         </div>
         <div className="p-6 text-center">
           <Clock className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">Không có khách đang chờ</p>
-          <p className="text-xs text-gray-400 mt-1">Khách mới sẽ xuất hiện ở đây</p>
+          <p className="text-sm text-gray-500">{t('noCustomersWaiting')}</p>
+          <p className="text-xs text-gray-400 mt-1">{t('newCustomersAppearHere')}</p>
         </div>
       </div>
     )
@@ -66,8 +68,8 @@ export default function QueueList({ waitingQueue, onStart }: QueueListProps) {
     <div className="bg-white rounded-lg shadow overflow-hidden">
       {/* Header */}
       <div className="p-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-        <h3 className="font-semibold text-sm text-gray-900">Danh sách chờ</h3>
-        <span className="text-xs text-gray-500">{waitingQueue.length} khách đang chờ</span>
+        <h3 className="font-semibold text-sm text-gray-900">{t('waitingList')}</h3>
+        <span className="text-xs text-gray-500">{t('customersWaiting', { count: waitingQueue.length })}</span>
       </div>
 
       {/* Queue Items */}

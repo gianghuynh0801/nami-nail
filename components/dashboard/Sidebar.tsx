@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
+import { Link, usePathname } from "@/i18n/navigation";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useTranslations } from "next-intl";
 
 import { 
   LayoutDashboard, 
@@ -41,84 +41,28 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose, isCollapsed = false, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname();
-  const { data: session } = useSession(); // Get session to check role
+  const { data: session } = useSession();
+  const t = useTranslations("Dashboard.sidebar");
+  const tCommon = useTranslations("Common");
 
   const menuItems: MenuItem[] = [
-    {
-      id: "dashboard",
-      label: "Bảng điều khiển",
-      icon: <LayoutDashboard className="w-5 h-5" />,
-      href: "/dashboard",
-    },
-    // {
-    //   id: "appointments",
-    //   label: "Lịch hẹn",
-    //   icon: <Calendar className="w-5 h-5" />,
-    //   href: "/dashboard/appointments",
-    // },
-    {
-      id: "services",
-      label: "Dịch vụ",
-      icon: <Sparkles className="w-5 h-5" />,
-      href: "/dashboard/services",
-    },
-    {
-      id: "calendar",
-      label: "Lịch hẹn",
-      icon: <CalendarClock className="w-5 h-5" />,
-      href: "/dashboard/calendar",
-    },
-    {
-      id: "customers",
-      label: "Khách hàng",
-      icon: <Users className="w-5 h-5" />,
-      href: "/dashboard/customers",
-    },
-    {
-      id: "invoices",
-      label: "Hóa đơn",
-      icon: <FileText className="w-5 h-5" />,
-      href: "/dashboard/invoices",
-    },
-    {
-      id: "branches",
-      label: "Chi nhánh",
-      icon: <Building2 className="w-5 h-5" />,
-      href: "/dashboard/branches",
-    },
-    {
-      id: "statistics",
-      label: "Thống kê",
-      icon: <BarChart3 className="w-5 h-5" />,
-      href: "/dashboard/statistics",
-    },
-
-    {
-      id: "work-schedule",
-      label: "Lịch làm việc",
-      icon: <CalendarDays className="w-5 h-5" />,
-      href: "/dashboard/work-schedule",
-    },
-    {
-      id: "staff",
-      label: "Nhân viên",
-      icon: <UserCog className="w-5 h-5" />,
-      href: "/dashboard/staff",
-    },
-    {
-      id: "shift-management",
-      label: "Chia ca Realtime",
-      icon: <Users className="w-5 h-5" />,
-      href: "/dashboard/shift-management",
-    },
+    { id: "dashboard", label: t("dashboard"), icon: <LayoutDashboard className="w-5 h-5" />, href: "/dashboard" },
+    { id: "services", label: t("services"), icon: <Sparkles className="w-5 h-5" />, href: "/dashboard/services" },
+    { id: "calendar", label: t("calendar"), icon: <CalendarClock className="w-5 h-5" />, href: "/dashboard/calendar" },
+    { id: "customers", label: t("customers"), icon: <Users className="w-5 h-5" />, href: "/dashboard/customers" },
+    { id: "invoices", label: t("invoices"), icon: <FileText className="w-5 h-5" />, href: "/dashboard/invoices" },
+    { id: "branches", label: t("branches"), icon: <Building2 className="w-5 h-5" />, href: "/dashboard/branches" },
+    { id: "statistics", label: t("statistics"), icon: <BarChart3 className="w-5 h-5" />, href: "/dashboard/statistics" },
+    { id: "work-schedule", label: t("workSchedule"), icon: <CalendarDays className="w-5 h-5" />, href: "/dashboard/work-schedule" },
+    { id: "staff", label: t("staff"), icon: <UserCog className="w-5 h-5" />, href: "/dashboard/staff" },
+    { id: "shift-management", label: t("shiftManagement"), icon: <Users className="w-5 h-5" />, href: "/dashboard/shift-management" },
   ];
 
-  // Add User Management link for OWNER and MANAGER
   if (session?.user?.role === 'OWNER' || session?.user?.role === 'MANAGER') {
     menuItems.push({
       id: "users",
-      label: "Quản lý User",
-      icon: <Users className="w-5 h-5 text-purple-500" />, // Use Users icon, maybe distinct color
+      label: t("userManagement"),
+      icon: <Users className="w-5 h-5 text-purple-500" />,
       href: "/dashboard/users",
     });
   }
@@ -200,8 +144,8 @@ export default function Sidebar({ isOpen, onClose, isCollapsed = false, onToggle
                 className={`hidden lg:flex p-1.5 hover:bg-gray-100 rounded-lg transition-colors ${
                   isCollapsed ? "w-full justify-center mt-2" : ""
                 }`}
-                aria-label={isCollapsed ? "Mở rộng sidebar" : "Thu nhỏ sidebar"}
-                title={isCollapsed ? "Mở rộng sidebar" : "Thu nhỏ sidebar"}
+                aria-label={isCollapsed ? tCommon("expandSidebar") : tCommon("collapseSidebar")}
+                title={isCollapsed ? tCommon("expandSidebar") : tCommon("collapseSidebar")}
               >
                 {isCollapsed ? (
                   <ChevronRight className="w-4 h-4 text-gray-600" />

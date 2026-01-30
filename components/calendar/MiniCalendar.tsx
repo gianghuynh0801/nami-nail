@@ -14,7 +14,8 @@ import {
   subMonths,
   getDay,
 } from 'date-fns'
-import { vi } from 'date-fns/locale'
+import { enUS, vi } from 'date-fns/locale'
+import { useLocale } from 'next-intl'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface MiniCalendarProps {
@@ -23,6 +24,8 @@ interface MiniCalendarProps {
 }
 
 export default function MiniCalendar({ selectedDate, onDateChange }: MiniCalendarProps) {
+  const locale = useLocale()
+  const dateFnsLocale = locale === 'vi' ? vi : enUS
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(selectedDate))
 
   // Update current month when selectedDate changes externally
@@ -55,8 +58,10 @@ export default function MiniCalendar({ selectedDate, onDateChange }: MiniCalenda
     }
   }
 
-  // Day names (Monday to Sunday) - Vietnamese abbreviations
-  const dayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'] // Thứ 2, Thứ 3, Thứ 4, Thứ 5, Thứ 6, Thứ 7, Chủ nhật
+  // Day names (Monday to Sunday) from locale
+  const dayNames = [1, 2, 3, 4, 5, 6, 7].map((d) =>
+    format(new Date(2024, 0, d), 'EEE', { locale: dateFnsLocale })
+  )
 
   return (
     <div className="bg-white rounded-lg border border-beige-dark shadow-sm">
@@ -71,7 +76,7 @@ export default function MiniCalendar({ selectedDate, onDateChange }: MiniCalenda
         </button>
         
         <h3 className="text-sm font-semibold text-gray-900">
-          {format(currentMonth, 'MMMM yyyy', { locale: vi })}
+          {format(currentMonth, 'MMMM yyyy', { locale: dateFnsLocale })}
         </h3>
         
         <button

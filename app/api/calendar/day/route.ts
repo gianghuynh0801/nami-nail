@@ -61,6 +61,7 @@ export async function GET(request: Request) {
           },
           include: {
             service: true,
+            appointmentServiceItems: true,
           },
           orderBy: { startTime: 'asc' },
         },
@@ -120,24 +121,34 @@ export async function GET(request: Request) {
             }
           : null,
         appointments: s.appointments
-          .map((apt) => ({
-            id: apt.id,
-            customerName: apt.customerName,
-            customerPhone: apt.customerPhone,
-            service: {
-              id: apt.service.id,
-              name: apt.service.name,
-              duration: apt.service.duration,
-            },
-            staffId: apt.staffId,
-            startTime: apt.startTime.toISOString(),
-            endTime: apt.endTime.toISOString(),
-            status: apt.status,
-            notes: apt.notes || undefined,
-            checkedInAt: apt.checkedInAt?.toISOString(),
-            startedAt: apt.startedAt?.toISOString(),
-            queueNumber: apt.queueNumber || undefined,
-          })),
+          .map((apt) => {
+            const servicesList = apt.appointmentServiceItems?.length
+              ? apt.appointmentServiceItems.map((i) => ({
+                  id: i.serviceId,
+                  name: i.serviceName,
+                  duration: i.serviceDuration,
+                }))
+              : [{ id: apt.service.id, name: apt.service.name, duration: apt.service.duration }]
+            return {
+              id: apt.id,
+              customerName: apt.customerName,
+              customerPhone: apt.customerPhone,
+              service: {
+                id: apt.service.id,
+                name: apt.service.name,
+                duration: apt.service.duration,
+              },
+              services: servicesList,
+              staffId: apt.staffId,
+              startTime: apt.startTime.toISOString(),
+              endTime: apt.endTime.toISOString(),
+              status: apt.status,
+              notes: apt.notes || undefined,
+              checkedInAt: apt.checkedInAt?.toISOString(),
+              startedAt: apt.startedAt?.toISOString(),
+              queueNumber: apt.queueNumber || undefined,
+            }
+          }),
       }
     })
 

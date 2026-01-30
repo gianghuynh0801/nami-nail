@@ -118,6 +118,8 @@ export default function BookingWizard({
     phone: "",
     email: "",
   });
+  const [guestCount, setGuestCount] = useState(1);
+  const [extraCustomers, setExtraCustomers] = useState<Array<{ name: string; phone: string; email: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [isMobile, setIsMobile] = useState(false);
@@ -154,8 +156,12 @@ export default function BookingWizard({
         return !!selectedStaffId || isAnyStaff;
       case "datetime":
         return !!selectedDate && !!selectedTime;
-      case "customer":
-        return !!customerInfo.name && !!customerInfo.phone;
+      case "customer": {
+        if (!customerInfo.name?.trim() || !customerInfo.phone?.trim()) return false;
+        if (guestCount <= 1) return true;
+        const rest = extraCustomers.slice(0, guestCount - 1);
+        return rest.length === guestCount - 1 && rest.every((c) => c.name?.trim() && c.phone?.trim());
+      }
       default:
         return true;
     }
@@ -235,17 +241,33 @@ export default function BookingWizard({
         salon.timezone,
       );
 
+      const staffIdForBooking = isAnyStaff ? (staff?.length ? staff[0].id : selectedStaffId) : selectedStaffId;
+      const payload: Record<string, unknown> = {
+        salonId: salon.id,
+        serviceIds: selectedServiceIds,
+        staffId: staffIdForBooking,
+        startTime: startTimeISO,
+      };
+      if (guestCount > 1) {
+        const allCustomers = [
+          { customerName: customerInfo.name, customerPhone: customerInfo.phone, customerEmail: customerInfo.email || "" },
+          ...extraCustomers.slice(0, guestCount - 1).map((c) => ({
+            customerName: c.name,
+            customerPhone: c.phone,
+            customerEmail: c.email || "",
+          })),
+        ];
+        payload.customers = allCustomers;
+      } else {
+        payload.customerName = customerInfo.name;
+        payload.customerPhone = customerInfo.phone;
+        payload.customerEmail = customerInfo.email || "";
+      }
+
       const response = await fetch("/api/booking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          salonId: salon.id,
-          customerName: customerInfo.name,
-          customerPhone: customerInfo.phone,
-          serviceIds: selectedServiceIds,
-          staffId: isAnyStaff ? null : selectedStaffId,
-          startTime: startTimeISO,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const responseData = await response.json();
@@ -350,6 +372,10 @@ export default function BookingWizard({
           <StepCustomerInfo
             customerInfo={customerInfo}
             onChange={setCustomerInfo}
+            guestCount={guestCount}
+            onGuestCountChange={setGuestCount}
+            extraCustomers={extraCustomers}
+            onExtraCustomersChange={setExtraCustomers}
           />
         );
       case "confirmation":
@@ -365,10 +391,12 @@ export default function BookingWizard({
           <StepConfirmation
             salon={salon}
             services={services.filter((s) => selectedServiceIds.includes(s.id))}
-            staff={staff.find((s) => s.id === selectedStaffId)}
+            staff={staff.find((s) => s.id === selectedStaffId) || (isAnyStaff && staff[0] ? staff[0] : undefined)}
             date={selectedDate}
             time={selectedTime}
             customerInfo={customerInfo}
+            guestCount={guestCount}
+            extraCustomers={extraCustomers.slice(0, guestCount - 1)}
             onSubmit={handleSubmit}
             loading={loading}
             error={error}

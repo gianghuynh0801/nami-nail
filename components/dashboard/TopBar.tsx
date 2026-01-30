@@ -9,11 +9,14 @@ import {
   Plus,
   ChevronDown,
   Building2,
+  Languages,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useState, useEffect } from "react";
 import { BookingWizardModal } from "@/components/booking-wizard";
 import { useSalonContext } from "@/contexts/SalonContext";
+import { useLocale, useTranslations } from "next-intl";
+import { Link, usePathname } from "@/i18n/navigation";
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -32,6 +35,10 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
   const [showBookingWizard, setShowBookingWizard] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [showSalonDropdown, setShowSalonDropdown] = useState(false);
+  const [showLocaleDropdown, setShowLocaleDropdown] = useState(false);
+  const locale = useLocale();
+  const pathname = usePathname();
+  const tTopBar = useTranslations("TopBar");
 
   useEffect(() => {
     setIsMounted(true);
@@ -76,7 +83,7 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
                   ·
                 </span>
                 <span className="truncate text-sm font-medium text-gray-700 flex-1 min-w-0">
-                  {selectedSalon?.name || "Chọn chi nhánh"}
+                  {selectedSalon?.name || tTopBar("selectBranch")}
                 </span>
                 <ChevronDown
                   className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${showSalonDropdown ? "rotate-180" : ""}`}
@@ -91,7 +98,7 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
                   />
                   <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
                     <div className="px-3 py-2 text-xs text-gray-500 font-medium uppercase tracking-wide border-b">
-                      Chi nhánh
+                      {tTopBar("branch")}
                     </div>
                     {salons.map((salon) => (
                       <button
@@ -136,7 +143,7 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
             className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-400 text-white rounded-lg hover:bg-primary-500 transition-colors text-sm font-medium shadow-sm"
           >
             <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Đặt lịch</span>
+            <span className="hidden sm:inline">{tTopBar("bookAppointment")}</span>
           </button>
 
           {/* Time - hidden on small mobile */}
@@ -155,6 +162,48 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
             {date}
           </div>
 
+          {/* Locale switcher */}
+          <div className="relative">
+            <button
+              onClick={() => setShowLocaleDropdown(!showLocaleDropdown)}
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors text-sm font-medium text-gray-700"
+              title="Language"
+            >
+              <Languages className="w-4 h-4" />
+              <span className="uppercase">{locale}</span>
+            </button>
+            {showLocaleDropdown && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowLocaleDropdown(false)}
+                />
+                <div className="absolute right-0 top-full mt-1 w-28 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                  <Link
+                    href={pathname}
+                    locale="en"
+                    onClick={() => setShowLocaleDropdown(false)}
+                    className={`block w-full text-left px-3 py-2 text-sm hover:bg-primary-50 ${
+                      locale === "en" ? "bg-primary-50 text-primary-700 font-medium" : "text-gray-700"
+                    }`}
+                  >
+                    English
+                  </Link>
+                  <Link
+                    href={pathname}
+                    locale="vi"
+                    onClick={() => setShowLocaleDropdown(false)}
+                    className={`block w-full text-left px-3 py-2 text-sm hover:bg-primary-50 ${
+                      locale === "vi" ? "bg-primary-50 text-primary-700 font-medium" : "text-gray-700"
+                    }`}
+                  >
+                    Tiếng Việt
+                  </Link>
+                </div>
+              </>
+            )}
+          </div>
+
           {/* Bell Icon */}
           <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <Bell className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600" />
@@ -169,7 +218,7 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
               <User className="w-3 h-3 lg:w-4 lg:h-4 text-white" />
             </div>
             <button
-              onClick={() => signOut({ callbackUrl: "/" })}
+              onClick={() => signOut({ callbackUrl: `/${locale}` })}
               className="p-2 hover:bg-beige-light rounded-lg transition-colors"
               title="Logout"
             >

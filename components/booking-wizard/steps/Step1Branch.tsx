@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Building2, MapPin, Phone, ChevronRight, Search } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import type { Salon } from '../types'
 
 interface Step1BranchProps {
@@ -11,6 +12,7 @@ interface Step1BranchProps {
 }
 
 export default function Step1Branch({ selectedSalonId, onSelect, onNext }: Step1BranchProps) {
+  const t = useTranslations('BookingWizard')
   const [salons, setSalons] = useState<Salon[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -58,7 +60,7 @@ export default function Step1Branch({ selectedSalonId, onSelect, onNext }: Step1
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-400 mx-auto" />
-          <p className="mt-4 text-gray-500">Đang tải danh sách chi nhánh...</p>
+          <p className="mt-4 text-gray-500">{t('loadingBranches')}</p>
         </div>
       </div>
     )
@@ -69,10 +71,10 @@ export default function Step1Branch({ selectedSalonId, onSelect, onNext }: Step1
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Chọn Chi nhánh
+          {t('selectBranchTitle')}
         </h2>
         <p className="text-gray-500">
-          Vui lòng chọn chi nhánh bạn muốn đặt lịch
+          {t('selectBranchHint')}
         </p>
       </div>
 
@@ -84,7 +86,7 @@ export default function Step1Branch({ selectedSalonId, onSelect, onNext }: Step1
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Tìm kiếm chi nhánh..."
+            placeholder={t('searchBranch')}
             className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-400 focus:border-transparent"
           />
         </div>
@@ -95,7 +97,7 @@ export default function Step1Branch({ selectedSalonId, onSelect, onNext }: Step1
         {filteredSalons.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <Building2 className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p>Không tìm thấy chi nhánh</p>
+            <p>{t('noBranchesFound')}</p>
           </div>
         ) : (
           filteredSalons.map((salon) => (
@@ -161,7 +163,7 @@ export default function Step1Branch({ selectedSalonId, onSelect, onNext }: Step1
             }
           `}
         >
-          Tiếp tục
+          {t('continue')}
           <ChevronRight className="w-5 h-5" />
         </button>
       </div>

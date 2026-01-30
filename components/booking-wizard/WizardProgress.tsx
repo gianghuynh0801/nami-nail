@@ -1,6 +1,7 @@
 'use client'
 
 import { Check, Building2, Scissors, User, Calendar, UserCircle, ClipboardCheck } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { STEPS } from './types'
 import type { WizardState } from './types'
 
@@ -20,6 +21,7 @@ interface WizardProgressProps {
 }
 
 export default function WizardProgress({ state, onStepClick, hideBranchSelection = false }: WizardProgressProps) {
+  const t = useTranslations('BookingWizard')
   const { currentStep, completedSteps, salon, services, staff, isAnyStaff, selectedDate, selectedTime } = state
 
   // Filter out step 1 if hideBranchSelection is true
@@ -41,11 +43,11 @@ export default function WizardProgress({ state, onStepClick, hideBranchSelection
         if (services.length > 0) {
           return services.length === 1 
             ? services[0].name 
-            : `${services.length} dịch vụ`
+            : t('servicesCount', { count: services.length })
         }
         return null
       case 3:
-        return isAnyStaff ? 'Bất kỳ' : staff?.name || null
+        return isAnyStaff ? t('any') : staff?.name || null
       case 4:
         if (selectedDate && selectedTime) {
           const date = new Date(selectedDate)
@@ -69,10 +71,10 @@ export default function WizardProgress({ state, onStepClick, hideBranchSelection
       {/* Header - Mobile */}
       <div className="lg:hidden mb-4">
         <h3 className="text-lg font-semibold">
-          Bước {hideBranchSelection ? currentStep - 1 : currentStep}/{visibleSteps.length}
+          {t('stepLabel')} {hideBranchSelection ? currentStep - 1 : currentStep}/{visibleSteps.length}
         </h3>
         <p className="text-sm text-primary-200">
-          {STEPS[currentStep - 1]?.title}
+          {STEPS[currentStep - 1] ? t(`step${STEPS[currentStep - 1].id}Title` as 'step1Title') : ''}
         </p>
       </div>
 
@@ -121,7 +123,7 @@ export default function WizardProgress({ state, onStepClick, hideBranchSelection
                 {/* Text */}
                 <div className="flex-1 min-w-0">
                   <p className={`font-medium text-sm ${status === 'pending' ? 'text-white/70' : 'text-white'}`}>
-                    {step.title}
+                    {t(`step${step.id}Title` as 'step1Title')}
                   </p>
                   {value ? (
                     <p className="text-xs text-primary-200 truncate mt-0.5">
@@ -129,7 +131,7 @@ export default function WizardProgress({ state, onStepClick, hideBranchSelection
                     </p>
                   ) : (
                     <p className="text-xs text-white/50 mt-0.5">
-                      {step.description}
+                      {t(`step${step.id}Desc` as 'step1Desc')}
                     </p>
                   )}
                 </div>

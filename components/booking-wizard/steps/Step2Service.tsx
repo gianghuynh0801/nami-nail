@@ -12,6 +12,7 @@ import {
   CheckSquare,
   Square,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { Service, ServiceCategory } from "../types";
 
 interface Step2ServiceProps {
@@ -42,6 +43,8 @@ export default function Step2Service({
   onServicesLoaded,
   hideNavigation = false,
 }: Step2ServiceProps) {
+  const t = useTranslations("BookingWizard");
+  const tCalendar = useTranslations("Calendar");
   const [services, setServices] = useState<Service[]>([]);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,7 +127,7 @@ export default function Step2Service({
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-400 mx-auto" />
-          <p className="mt-4 text-gray-500">Đang tải danh sách dịch vụ...</p>
+          <p className="mt-4 text-gray-500">{t("loadingServices")}</p>
         </div>
       </div>
     );
@@ -134,9 +137,9 @@ export default function Step2Service({
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Chọn Dịch vụ</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">{t("selectService")}</h2>
         <p className="text-gray-500">
-          Chọn một hoặc nhiều dịch vụ bạn muốn sử dụng
+          {t("selectServiceHint")}
         </p>
       </div>
 
@@ -144,10 +147,9 @@ export default function Step2Service({
       {categories.length > 0 && (
         <div>
           <p className="text-sm font-medium text-gray-700 mb-3">
-            Chọn danh mục
+            {t("selectCategory")}
           </p>
           <div className="flex flex-wrap gap-2">
-            {/* "Tất cả" button */}
             <button
               onClick={() => handleCategorySelect(null)}
               className={`
@@ -160,7 +162,7 @@ export default function Step2Service({
               `}
             >
               {selectedCategoryId === null && <Check className="w-4 h-4" />}
-              <span>Tất cả</span>
+              <span>{t("all")}</span>
             </button>
 
             {/* Category buttons */}
@@ -195,7 +197,7 @@ export default function Step2Service({
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Tìm kiếm dịch vụ..."
+            placeholder={t("searchService")}
             className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-400 focus:border-transparent"
           />
         </div>
@@ -205,20 +207,20 @@ export default function Step2Service({
       <div>
         <p className="text-sm font-medium text-gray-700 mb-3">
           {selectedCategoryId === null
-            ? "Chọn dịch vụ"
-            : `Dịch vụ ${categories.find((c) => c.id === selectedCategoryId)?.name || ""}`}
+            ? t("selectServiceLabel")
+            : t("servicesCategory", { name: categories.find((c) => c.id === selectedCategoryId)?.name || "" })}
         </p>
         <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
           {filteredServices.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <Scissors className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p>Không tìm thấy dịch vụ</p>
+              <p>{t("noServicesFound")}</p>
               {selectedCategoryId !== null && (
                 <button
                   onClick={() => handleCategorySelect(null)}
                   className="mt-2 text-primary-600 hover:underline text-sm"
                 >
-                  Xem tất cả dịch vụ
+                  {t("viewAllServices")}
                 </button>
               )}
             </div>
@@ -261,7 +263,7 @@ export default function Step2Service({
                       <div className="flex items-center gap-4 text-sm">
                         <span className="flex items-center gap-1 text-gray-500">
                           <Clock className="w-4 h-4" />
-                          {service.duration} phút
+                          {tCalendar("minutes", { count: service.duration })}
                         </span>
                         <span className="flex items-center gap-1 font-semibold text-primary-600">
                           <DollarSign className="w-4 h-4" />
@@ -285,7 +287,7 @@ export default function Step2Service({
             className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
-            Quay lại
+            {t("back")}
           </button>
           <button
             onClick={handleContinue}
@@ -299,7 +301,7 @@ export default function Step2Service({
               }
             `}
           >
-            Tiếp tục ({selectedServiceIds.length})
+            {t("continueWithCount", { count: selectedServiceIds.length })}
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>

@@ -16,7 +16,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: 'Nami Nail - Salon Management',
-  description: 'Quản lý và đặt lịch online cho salon nail',
+  description: 'Manage and book appointments online for your nail salon',
 }
 
 export default function RootLayout({
@@ -25,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="vi">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${playfair.variable} font-inter`}>
         <Providers>{children}</Providers>
       </body>

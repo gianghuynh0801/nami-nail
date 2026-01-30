@@ -3,7 +3,9 @@
 import { useState } from 'react'
 import { X, Clock, User, GripVertical, Phone, AlertCircle } from 'lucide-react'
 import { formatDistanceToNow, format, parseISO, differenceInMinutes } from 'date-fns'
-import { vi } from 'date-fns/locale'
+import { enUS, vi } from 'date-fns/locale'
+import { useLocale } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import type { WaitingAppointment, CalendarStaff, CalendarAppointment } from './types'
 
 interface WaitingListSidebarProps {
@@ -24,6 +26,9 @@ export default function WaitingListSidebar({
   checkedInAppointments = [],
   onStartAppointment,
 }: WaitingListSidebarProps) {
+  const locale = useLocale()
+  const t = useTranslations('Calendar')
+  const dateFnsLocale = locale === 'vi' ? vi : enUS
   const [selectedAppointment, setSelectedAppointment] = useState<string | null>(null)
   const [draggedAppointment, setDraggedAppointment] = useState<string | null>(null)
 
@@ -63,8 +68,8 @@ export default function WaitingListSidebar({
       <div className="p-4 border-b border-beige-dark bg-beige-light flex-shrink-0">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-gray-900">Danh sách chờ</h3>
-            <p className="text-sm text-gray-500">{totalWaiting} khách đang chờ</p>
+            <h3 className="font-semibold text-gray-900">{t('waitingList')}</h3>
+            <p className="text-sm text-gray-500">{t('customersWaiting', { count: totalWaiting })}</p>
           </div>
           <button
             onClick={onClose}
@@ -77,11 +82,10 @@ export default function WaitingListSidebar({
 
       {/* List */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {/* Phần 1: Đã check-in (đang chờ làm) */}
         {checkedInAppointments.length > 0 && (
           <>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide px-1 mb-2">
-              Đã check-in ({checkedInAppointments.length})
+              {t('checkedInCount', { count: checkedInAppointments.length })}
             </p>
             {checkedInAppointments.map((apt) => {
               const checkedInAt = apt.checkedInAt ? parseISO(apt.checkedInAt) : null
@@ -131,30 +135,29 @@ export default function WaitingListSidebar({
                       onClick={() => onStartAppointment(apt.id)}
                       className="mt-2 w-full px-3 py-1.5 text-xs bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors font-medium"
                     >
-                      Bắt đầu làm
+                      {t('startService')}
                     </button>
                   )}
                 </div>
               )
             })}
-            <p className="text-xs text-gray-500 px-1 mt-2 mb-1">💡 Kéo thả để sắp xếp lại thứ tự</p>
+            <p className="text-xs text-gray-500 px-1 mt-2 mb-1">💡 {t('reorderHint')}</p>
           </>
         )}
 
-        {/* Phần 2: Chờ xác nhận / chưa gán */}
         {appointments.length === 0 && checkedInAppointments.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">Không có khách đang chờ</p>
+            <p className="text-sm">{t('noCustomersWaiting')}</p>
             <p className="text-xs text-gray-400 mt-1">
-              Khách mới sẽ xuất hiện ở đây
+              {t('newCustomersAppearHere')}
             </p>
           </div>
         ) : (
           <>
             {checkedInAppointments.length > 0 && (
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide px-1 mb-2 mt-3">
-                Chờ xác nhận / chưa gán ({appointments.length})
+                {t('pendingUnassignedCount', { count: appointments.length })}
               </p>
             )}
             {appointments.map((apt) => (
@@ -200,7 +203,7 @@ export default function WaitingListSidebar({
                         ? 'bg-blue-100 text-blue-700'
                         : 'bg-teal-100 text-teal-700'}
                     `}>
-                      {apt.status === 'PENDING' ? 'Chờ xác nhận' : apt.status === 'CONFIRMED' ? 'Đã xác nhận' : 'Đã check-in'}
+                      {apt.status === 'PENDING' ? t('statusPending') : apt.status === 'CONFIRMED' ? t('statusConfirmed') : t('statusCheckedIn')}
                     </span>
                   </div>
                   <p className="text-xs text-gray-600 truncate">
@@ -215,7 +218,7 @@ export default function WaitingListSidebar({
                       </span>
                     )}
                     <span className="flex items-center gap-1 text-xs text-gray-500">
-                      {apt.service.duration} phút
+                      {t('minutes', { count: apt.service.duration })}
                     </span>
                     {apt.customerPhone && (
                       <span className="flex items-center gap-1 text-xs text-gray-500">
@@ -227,13 +230,13 @@ export default function WaitingListSidebar({
                   {/* Nhân viên đã gán */}
                   {apt.assignedStaff && (
                     <p className="text-[10px] text-blue-600 mt-1">
-                      👤 Gán cho: {apt.assignedStaff.name}
+                      👤 {t('assignedTo', { name: apt.assignedStaff.name })}
                     </p>
                   )}
                   {/* Thời gian đã đặt */}
                   {apt.createdAt && (
                     <p className="text-[10px] text-gray-400 mt-1">
-                      Đặt {formatDistanceToNow(new Date(apt.createdAt), { addSuffix: true, locale: vi })}
+                      {t('bookedAgo', { time: formatDistanceToNow(new Date(apt.createdAt), { addSuffix: true, locale: dateFnsLocale }) })}
                     </p>
                   )}
                 </div>
@@ -242,7 +245,7 @@ export default function WaitingListSidebar({
               {/* Quick assign buttons */}
               {selectedAppointment === apt.id && workingStaff.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-beige-dark">
-                  <p className="text-xs text-gray-500 mb-2">Gán nhanh cho:</p>
+                  <p className="text-xs text-gray-500 mb-2">{t('quickAssignTo')}</p>
                   <div className="flex flex-wrap gap-1">
                     {workingStaff.slice(0, 6).map((s) => (
                       <button
@@ -279,7 +282,7 @@ export default function WaitingListSidebar({
       {/* Footer hint */}
       <div className="p-3 border-t border-beige-dark bg-beige-light flex-shrink-0">
         <p className="text-xs text-gray-500 text-center">
-          💡 Kéo thả khách vào lịch hoặc nhấn để gán nhanh
+          💡 {t('dragHint')}
         </p>
       </div>
     </div>

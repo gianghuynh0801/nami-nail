@@ -11,7 +11,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { format } from "date-fns";
-import { vi } from "date-fns/locale";
+import { enUS, vi } from "date-fns/locale";
+import { useLocale, useTranslations } from "next-intl";
 import type { WizardState } from "../types";
 
 interface Step7SuccessProps {
@@ -25,6 +26,9 @@ export default function Step7Success({
   onClose,
   onViewAppointment,
 }: Step7SuccessProps) {
+  const locale = useLocale();
+  const t = useTranslations("Booking");
+  const dateFnsLocale = locale === "vi" ? vi : enUS;
   const {
     salon,
     services,
@@ -64,10 +68,10 @@ export default function Step7Success({
       {/* Success Message */}
       <div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Đặt lịch thành công! 🎉
+          {t("successTitle")} 🎉
         </h2>
         <p className="text-gray-500">
-          Cảm ơn bạn đã đặt lịch tại {salon?.name}
+          {salon?.name ? t("thankYou", { name: salon.name }) : t("successTitle")}
         </p>
       </div>
 
@@ -75,7 +79,7 @@ export default function Step7Success({
       {createdAppointmentId && (
         <div className="inline-block bg-gray-100 rounded-full px-4 py-2">
           <p className="text-sm text-gray-600">
-            Mã đặt lịch:{" "}
+            {t("bookingCode")}:{" "}
             <span className="font-mono font-semibold text-gray-900">
               #{createdAppointmentId.slice(0, 8).toUpperCase()}
             </span>
@@ -100,10 +104,10 @@ export default function Step7Success({
               <div>
                 <p className="font-medium text-gray-900">
                   {format(new Date(selectedDate), "EEEE, dd/MM/yyyy", {
-                    locale: vi,
+                    locale: dateFnsLocale,
                   })}
                 </p>
-                <p className="text-sm text-gray-600">Lúc {selectedTime}</p>
+                <p className="text-sm text-gray-600">{selectedTime}</p>
               </div>
             </div>
           )}
@@ -121,32 +125,32 @@ export default function Step7Success({
             </div>
           )}
 
-          {/* Nhân viên thực hiện */}
+          {/* {t("staffPerforming")} */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0">
               <User className="w-5 h-5 text-primary-600" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium text-primary-600 uppercase tracking-wide mb-1">
-                Nhân viên thực hiện
+                {t("staffPerforming")}
               </p>
               {isAnyStaff ? (
                 <p className="font-medium text-gray-900">
-                  Hệ thống sẽ phân công nhân viên phù hợp
+                  {t("systemWillAssign")}
                 </p>
               ) : staff ? (
                 <>
                   <p className="font-medium text-gray-900">{staff.name}</p>
                   {staff.phone && (
                     <p className="text-sm text-gray-600 mt-0.5">
-                      Liên hệ:{" "}
+                      {t("contact")}:{" "}
                       <span className="font-medium">{staff.phone}</span>
                     </p>
                   )}
                 </>
               ) : null}
               <div className="text-sm text-gray-600 mt-1.5">
-                <span className="font-medium text-gray-700">Dịch vụ: </span>
+                <span className="font-medium text-gray-700">{t("step2Title")}: </span>
                 {services.map((s) => s.name).join(", ")}
               </div>
             </div>
@@ -156,7 +160,7 @@ export default function Step7Success({
           {services.length > 0 && (
             <div className="pt-3 mt-3 border-t border-primary-200">
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">Tổng thanh toán</span>
+                <span className="text-gray-600">{t("totalPayment")}</span>
                 <span className="text-xl font-bold text-primary-600">
                   {formatPrice(totalPrice)}
                 </span>
@@ -171,7 +175,7 @@ export default function Step7Success({
         <div className="flex items-center gap-2 text-blue-700">
           <Phone className="w-5 h-5" />
           <p className="text-sm">
-            Xác nhận sẽ được gửi đến{" "}
+            {t("confirmWillBeSent")}{" "}
             <span className="font-semibold">{customerInfo.phone}</span>
           </p>
         </div>

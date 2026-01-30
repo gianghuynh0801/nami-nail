@@ -13,7 +13,9 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed:shift": "npx tsx prisma/seed-shift.ts",
-    "db:create-admin": "npx tsx prisma/create-admin.ts"
+    "db:create-admin": "npx tsx prisma/create-admin.ts",
+    "i18n:translate": "npx tsx scripts/translate-locale.ts",
+    "i18n:translate:dry": "SKIP_TRANSLATE=1 npx tsx scripts/translate-locale.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -30,6 +32,7 @@
     "moment": "^2.30.1",
     "next": "14.0.4",
     "next-auth": "^4.24.5",
+    "next-intl": "^4.8.0",
     "pg": "^8.16.3",
     "rdndmb-html5-to-touch": "^9.0.0",
     "react": "^18.2.0",

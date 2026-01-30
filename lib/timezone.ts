@@ -1,6 +1,7 @@
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
 
-export const DEFAULT_SALON_TIMEZONE = 'Asia/Ho_Chi_Minh'
+/** Austria: Europe/Vienna (CET/CEST, UTC+1 / UTC+2) */
+export const DEFAULT_SALON_TIMEZONE = 'Europe/Vienna'
 
 export function getSalonTz(tz?: string | null) {
   return tz || DEFAULT_SALON_TIMEZONE

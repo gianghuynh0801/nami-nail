@@ -1,7 +1,9 @@
 'use client'
 
 import { format } from 'date-fns'
-import { vi } from 'date-fns/locale'
+import { enUS, vi } from 'date-fns/locale'
+import { useLocale } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { ChevronLeft, ChevronRight, Calendar, List, Plus } from 'lucide-react'
 
 interface CalendarHeaderProps {
@@ -27,17 +29,19 @@ export default function CalendarHeader({
   waitingCount,
   onAddAppointment,
 }: CalendarHeaderProps) {
+  const locale = useLocale()
+  const t = useTranslations('Calendar')
+  const dateFnsLocale = locale === 'vi' ? vi : enUS
   const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
-  
-  const formattedDate = format(selectedDate, 'EEEE, dd/MM/yyyy', { locale: vi })
+  const formattedDate = format(selectedDate, 'EEEE, dd/MM/yyyy', { locale: dateFnsLocale })
   const capitalizedDate = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1)
 
   const statusLegend = [
-    { status: 'PENDING', label: 'Chờ xác nhận', color: 'bg-yellow-400' },
-    { status: 'CONFIRMED', label: 'Đã xác nhận', color: 'bg-blue-400' },
-    { status: 'CHECKED_IN', label: 'Đã check-in', color: 'bg-teal-400' },
-    { status: 'IN_PROGRESS', label: 'Đang thực hiện', color: 'bg-purple-400' },
-    { status: 'COMPLETED', label: 'Hoàn thành', color: 'bg-gray-400' },
+    { status: 'PENDING', label: t('statusPending'), color: 'bg-yellow-400' },
+    { status: 'CONFIRMED', label: t('statusConfirmed'), color: 'bg-blue-400' },
+    { status: 'CHECKED_IN', label: t('statusCheckedIn'), color: 'bg-teal-400' },
+    { status: 'IN_PROGRESS', label: t('statusInProgress'), color: 'bg-purple-400' },
+    { status: 'COMPLETED', label: t('statusCompleted'), color: 'bg-gray-400' },
   ]
 
   return (
@@ -59,7 +63,7 @@ export default function CalendarHeader({
             <button
               onClick={onPrevDay}
               className="p-2 hover:bg-beige-light rounded-lg transition-colors"
-              title="Ngày trước"
+              title={t('prevDay')}
             >
               <ChevronLeft className="w-5 h-5 text-gray-600" />
             </button>
@@ -69,7 +73,7 @@ export default function CalendarHeader({
             <button
               onClick={onNextDay}
               className="p-2 hover:bg-beige-light rounded-lg transition-colors"
-              title="Ngày sau"
+              title={t('nextDay')}
             >
               <ChevronRight className="w-5 h-5 text-gray-600" />
             </button>
@@ -97,7 +101,7 @@ export default function CalendarHeader({
                 className="flex items-center gap-2 px-4 py-2 bg-primary-400 text-white rounded-lg hover:bg-primary-500 transition-colors text-sm font-medium"
               >
                 <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">Thêm lịch</span>
+                <span className="hidden sm:inline">{t('addAppointment')}</span>
               </button>
             )}
 
@@ -112,7 +116,7 @@ export default function CalendarHeader({
             `}
           >
               <List className="w-4 h-4" />
-              <span>Danh sách chờ</span>
+              <span>{t('waitingList')}</span>
               {waitingCount > 0 && (
                 <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-500 text-white">
                   {waitingCount}

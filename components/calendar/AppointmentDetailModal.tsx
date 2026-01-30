@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, User, Phone, Scissors, Clock, Calendar, MapPin, FileText, Play, CheckCircle, XCircle, Edit2, Trash2, Loader2, LogIn, Save, UserCog, Plus, AlertTriangle, DollarSign } from 'lucide-react'
+import { X, User, Phone, Scissors, Clock, Calendar, MapPin, FileText, Play, CheckCircle, XCircle, Edit2, Trash2, Loader2, LogIn, Save, UserCog, Plus, AlertTriangle, DollarSign, Copy } from 'lucide-react'
 import { format, parseISO, differenceInMinutes, addMinutes, isBefore, isAfter, areIntervalsOverlapping } from 'date-fns'
-import { vi } from 'date-fns/locale'
+import { enUS, vi } from 'date-fns/locale'
+import { useLocale } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import type { CalendarAppointment } from './types'
 
 // Interface cho dịch vụ thêm thủ công
@@ -61,15 +63,22 @@ interface AppointmentDetailModalProps {
   isAdmin?: boolean
 }
 
-// ... STATUS_CONFIG ... (Keep existing if not changing)
-const STATUS_CONFIG = {
-  PENDING: { label: 'Chờ xác nhận', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Clock },
-  CONFIRMED: { label: 'Đã xác nhận', color: 'bg-blue-100 text-blue-800 border-blue-200', icon: CheckCircle },
-  CHECKED_IN: { label: 'Đã check-in', color: 'bg-green-100 text-green-800 border-green-200', icon: LogIn },
-  IN_PROGRESS: { label: 'Đang thực hiện', color: 'bg-purple-100 text-purple-800 border-purple-200', icon: Play },
-  COMPLETED: { label: 'Hoàn thành', color: 'bg-gray-100 text-gray-800 border-gray-200', icon: CheckCircle },
-  CANCELLED: { label: 'Đã hủy', color: 'bg-red-100 text-red-800 border-red-200', icon: XCircle },
-}
+const STATUS_ICONS = {
+  PENDING: Clock,
+  CONFIRMED: CheckCircle,
+  CHECKED_IN: LogIn,
+  IN_PROGRESS: Play,
+  COMPLETED: CheckCircle,
+  CANCELLED: XCircle,
+} as const
+const STATUS_COLORS = {
+  PENDING: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  CONFIRMED: 'bg-blue-100 text-blue-800 border-blue-200',
+  CHECKED_IN: 'bg-green-100 text-green-800 border-green-200',
+  IN_PROGRESS: 'bg-purple-100 text-purple-800 border-purple-200',
+  COMPLETED: 'bg-gray-100 text-gray-800 border-gray-200',
+  CANCELLED: 'bg-red-100 text-red-800 border-red-200',
+} as const
 
 export default function AppointmentDetailModal({
   salonId,
@@ -88,6 +97,9 @@ export default function AppointmentDetailModal({
   onUpdate,
   isAdmin = false,
 }: AppointmentDetailModalProps) {
+  const locale = useLocale()
+  const t = useTranslations('Calendar')
+  const dateFnsLocale = locale === 'vi' ? vi : enUS
   const [isLoading, setIsLoading] = useState(false)
   const [actionType, setActionType] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -101,6 +113,12 @@ export default function AppointmentDetailModal({
   // Extra Services State (manual input)
   const [extraServices, setExtraServices] = useState<ExtraService[]>([])
   const [conflictWarning, setConflictWarning] = useState<string | null>(null)
+
+  // Duplicate same-time booking
+  const [showDuplicateForm, setShowDuplicateForm] = useState(false)
+  const [duplicateForm, setDuplicateForm] = useState({ customerName: '', customerPhone: '', customerEmail: '' })
+  const [duplicateLoading, setDuplicateLoading] = useState(false)
+  const [duplicateError, setDuplicateError] = useState<string | null>(null)
 
   const [editForm, setEditForm] = useState({
     customerName: '',
@@ -116,6 +134,9 @@ export default function AppointmentDetailModal({
   useEffect(() => {
     if (appointment) {
       setIsEditing(false)
+      setShowDuplicateForm(false)
+      setDuplicateForm({ customerName: '', customerPhone: '', customerEmail: '' })
+      setDuplicateError(null)
       // Parse existing extra services from notes
       setExtraServices(parseExtraServices(appointment.notes))
       setConflictWarning(null)
@@ -271,8 +292,18 @@ export default function AppointmentDetailModal({
   // Existing render helpers...
   if (!isOpen || !appointment) return null
   
-  const statusConfig = STATUS_CONFIG[appointment.status] || STATUS_CONFIG.PENDING
-  const StatusIcon = statusConfig.icon
+  const STATUS_LABEL_KEYS: Record<string, string> = {
+    PENDING: 'statusPending',
+    CONFIRMED: 'statusConfirmed',
+    CHECKED_IN: 'statusCheckedIn',
+    IN_PROGRESS: 'statusInProgress',
+    COMPLETED: 'statusCompleted',
+    CANCELLED: 'statusCancelled',
+  }
+  const statusLabelKey = STATUS_LABEL_KEYS[appointment.status] || 'statusPending'
+  const StatusIcon = STATUS_ICONS[appointment.status] || Clock
+  const statusColor = STATUS_COLORS[appointment.status] || STATUS_COLORS.PENDING
+  const statusLabel = t(statusLabelKey as 'statusPending')
   const startTimeObj = parseISO(appointment.startTime)
   const endTimeObj = parseISO(appointment.endTime)
 
@@ -297,17 +328,50 @@ export default function AppointmentDetailModal({
     }
   }
 
+  const handleDuplicateSubmit = async () => {
+    if (!appointment) return
+    const { customerName, customerPhone, customerEmail } = duplicateForm
+    if (!customerName.trim() || !customerPhone.trim()) {
+      setDuplicateError('Vui lòng nhập tên và số điện thoại khách hàng.')
+      return
+    }
+    setDuplicateLoading(true)
+    setDuplicateError(null)
+    try {
+      const res = await fetch('/api/appointments/duplicate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appointmentId: appointment.id,
+          customerName: customerName.trim(),
+          customerPhone: customerPhone.trim(),
+          customerEmail: customerEmail?.trim() || '',
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Không tạo được lịch')
+      setShowDuplicateForm(false)
+      setDuplicateForm({ customerName: '', customerPhone: '', customerEmail: '' })
+      if (onUpdate) onUpdate()
+      onClose()
+    } catch (err: any) {
+      setDuplicateError(err.message || 'Có lỗi xảy ra')
+    } finally {
+      setDuplicateLoading(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-scale-in flex flex-col max-h-[90vh]">
         
         {/* Header */}
-        <div className={`px-6 py-4 ${statusConfig.color} border-b flex-shrink-0`}>
+        <div className={`px-6 py-4 ${statusColor} border-b flex-shrink-0`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <StatusIcon className="w-5 h-5" />
-              <span className="font-medium">{statusConfig.label}</span>
+              <span className="font-medium">{statusLabel}</span>
             </div>
             <button onClick={onClose} className="p-1 hover:bg-black/10 rounded-full transition-colors">
               <X className="w-5 h-5" />
@@ -467,8 +531,14 @@ export default function AppointmentDetailModal({
                   </>
                 ) : (
                   <>
-                    <p className="font-medium text-gray-900">{appointment.service.name} <span className="text-sm font-normal text-gray-500">({appointment.service.duration} phút)</span></p>
-                    {/* Show extra services in view mode */}
+                    {(appointment.services && appointment.services.length > 0
+                      ? appointment.services
+                      : [{ id: appointment.service.id, name: appointment.service.name, duration: appointment.service.duration }]
+                    ).map((svc, idx) => (
+                      <p key={svc.id || idx} className="font-medium text-gray-900">
+                        {idx + 1}. {svc.name} <span className="text-sm font-normal text-gray-500">({svc.duration} phút)</span>
+                      </p>
+                    ))}
                     {parseExtraServices(appointment.notes).length > 0 && (
                       <div className="mt-2 space-y-1">
                         {parseExtraServices(appointment.notes).map((extra, idx) => (
@@ -531,7 +601,7 @@ export default function AppointmentDetailModal({
                    </div>
                 ) : (
                   <>
-                    <p className="font-medium text-gray-900">{format(startTimeObj, 'EEEE, dd/MM/yyyy', { locale: vi })}</p>
+                    <p className="font-medium text-gray-900">{format(startTimeObj, 'EEEE, dd/MM/yyyy', { locale: dateFnsLocale })}</p>
                     <p className="text-sm text-gray-600">{format(startTimeObj, 'HH:mm')} - {format(endTimeObj, 'HH:mm')}</p>
                   </>
                 )}
@@ -544,11 +614,11 @@ export default function AppointmentDetailModal({
                  <FileText className="w-5 h-5 text-yellow-600" />
                </div>
                <div className="flex-1">
-                 <p className="text-sm text-gray-500">Ghi chú</p>
+                 <p className="text-sm text-gray-500">{t('notes')}</p>
                  {isEditing ? (
-                    <textarea className="w-full mt-1 px-2 py-1 border rounded" rows={3} placeholder="Ghi chú thêm..." value={editForm.notes} onChange={e => setEditForm(prev => ({ ...prev, notes: e.target.value }))} />
+                    <textarea className="w-full mt-1 px-2 py-1 border rounded" rows={3} placeholder={t('notesPlaceholder')} value={editForm.notes} onChange={e => setEditForm(prev => ({ ...prev, notes: e.target.value }))} />
                  ) : (
-                    <p className="text-gray-700 whitespace-pre-wrap">{getDisplayNotes(appointment.notes) || 'Không có ghi chú'}</p>
+                    <p className="text-gray-700 whitespace-pre-wrap">{getDisplayNotes(appointment.notes) || t('noNotes')}</p>
                  )}
                </div>
             </div>
@@ -557,7 +627,7 @@ export default function AppointmentDetailModal({
             {!isEditing && salonName && (
                <div className="flex items-center gap-3">
                  <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center"><MapPin className="w-5 h-5 text-primary-600" /></div>
-                 <div className="flex-1"><p className="text-sm text-gray-500">Chi nhánh</p><p className="font-medium text-gray-900">{salonName}</p></div>
+                 <div className="flex-1"><p className="text-sm text-gray-500">{t('branch')}</p><p className="font-medium text-gray-900">{salonName}</p></div>
                </div>
             )}
             
@@ -565,7 +635,7 @@ export default function AppointmentDetailModal({
             {!isEditing && appointment.queueNumber && (
               <div className="flex items-center gap-3">
                  <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center"><span className="text-lg font-bold text-green-700">{appointment.queueNumber}</span></div>
-                 <div className="flex-1"><p className="text-sm text-gray-500">Số thứ tự</p><p className="font-medium text-gray-900">#{appointment.queueNumber}</p></div>
+                 <div className="flex-1"><p className="text-sm text-gray-500">{t('queueNumber')}</p><p className="font-medium text-gray-900">#{appointment.queueNumber}</p></div>
               </div>
             )}
           </div>
@@ -574,8 +644,53 @@ export default function AppointmentDetailModal({
         {/* Footer */}
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex-shrink-0">
           {error && <div className="mb-3 p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
-          
-          {isEditing ? (
+          {duplicateError && <div className="mb-3 p-3 bg-red-50 text-red-600 rounded-lg text-sm">{duplicateError}</div>}
+
+          {showDuplicateForm ? (
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-gray-700">{t('duplicateSameTimeTitle')}</p>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  placeholder={t('customerName')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  value={duplicateForm.customerName}
+                  onChange={(e) => setDuplicateForm((p) => ({ ...p, customerName: e.target.value }))}
+                />
+                <input
+                  type="tel"
+                  placeholder={t('customerPhone')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  value={duplicateForm.customerPhone}
+                  onChange={(e) => setDuplicateForm((p) => ({ ...p, customerPhone: e.target.value }))}
+                />
+                <input
+                  type="email"
+                  placeholder={t('emailOptional')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  value={duplicateForm.customerEmail}
+                  onChange={(e) => setDuplicateForm((p) => ({ ...p, customerEmail: e.target.value }))}
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleDuplicateSubmit}
+                  disabled={duplicateLoading}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 font-medium disabled:opacity-50"
+                >
+                  {duplicateLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+                  {t('createAppointment')}
+                </button>
+                <button
+                  onClick={() => { setShowDuplicateForm(false); setDuplicateError(null); }}
+                  disabled={duplicateLoading}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
+                >
+                  {t('cancel')}
+                </button>
+              </div>
+            </div>
+          ) : isEditing ? (
              <div className="flex gap-3">
                 <button
                   onClick={handleSaveEdit}
@@ -584,30 +699,36 @@ export default function AppointmentDetailModal({
                   className={`flex-1 px-4 py-2 text-white rounded-lg font-medium flex items-center justify-center gap-2 ${conflictWarning ? 'bg-orange-500 hover:bg-orange-600' : 'bg-primary-500 hover:bg-primary-600'}`}
                 >
                   {isLoading ? <Loader2 className="animate-spin w-4 h-4"/> : <Save className="w-4 h-4"/>}
-                  {conflictWarning ? 'Lưu (Bỏ qua cảnh báo)' : 'Lưu thay đổi'}
+                  {conflictWarning ? t('saveIgnoreWarning') : t('saveChanges')}
                 </button>
-                <button onClick={() => setIsEditing(false)} disabled={isLoading} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium">Hủy</button>
+                <button onClick={() => setIsEditing(false)} disabled={isLoading} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium">{t('cancel')}</button>
              </div>
           ) : (
             <div className="flex flex-col gap-3">
                <div className="flex gap-2">
-                {appointment.status === 'PENDING' && isAdmin && onConfirm && <button onClick={() => handleAction('confirm')} disabled={isLoading} className="flex-1 btn-primary py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600">Xác nhận</button>}
-                {appointment.status === 'CONFIRMED' && onCheckIn && <button onClick={() => handleAction('checkIn')} disabled={isLoading} className="flex-1 py-2 rounded-lg bg-green-500 text-white hover:bg-green-600">Đã đến</button>}
-                {appointment.status === 'CHECKED_IN' && onStart && <button onClick={() => handleAction('start')} disabled={isLoading} className="flex-1 py-2 rounded-lg bg-purple-500 text-white hover:bg-purple-600">Bắt đầu làm</button>}
-                {appointment.status === 'IN_PROGRESS' && onComplete && <button onClick={() => handleAction('complete')} disabled={isLoading} className="flex-1 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600">Hoàn thành</button>}
+                {appointment.status === 'PENDING' && isAdmin && onConfirm && <button onClick={() => handleAction('confirm')} disabled={isLoading} className="flex-1 btn-primary py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600">{t('confirm')}</button>}
+                {appointment.status === 'CONFIRMED' && onCheckIn && <button onClick={() => handleAction('checkIn')} disabled={isLoading} className="flex-1 py-2 rounded-lg bg-green-500 text-white hover:bg-green-600">{t('arrived')}</button>}
+                {appointment.status === 'CHECKED_IN' && onStart && <button onClick={() => handleAction('start')} disabled={isLoading} className="flex-1 py-2 rounded-lg bg-purple-500 text-white hover:bg-purple-600">{t('startService')}</button>}
+                {appointment.status === 'IN_PROGRESS' && onComplete && <button onClick={() => handleAction('complete')} disabled={isLoading} className="flex-1 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600">{t('complete')}</button>}
                </div>
 
               <div className="flex gap-2">
-                 {/* Allow editing even if appointment time has passed - only restrict by status */}
+                 {onCancel && appointment.status !== 'COMPLETED' && appointment.status !== 'CANCELLED' && (
+                   <button onClick={() => handleAction('cancel')} disabled={isLoading} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-medium"><Trash2 className="w-4 h-4" /> {t('cancelAppointment')}</button>
+                 )}
+                 {appointment.status !== 'COMPLETED' && appointment.status !== 'CANCELLED' && (
+                   <button
+                     onClick={() => setShowDuplicateForm(true)}
+                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors font-medium"
+                   >
+                     <Copy className="w-4 h-4" /> {t('duplicateSameTimeBtn')}
+                   </button>
+                 )}
                  {appointment.status !== 'COMPLETED' && appointment.status !== 'CANCELLED' && (
                    <button onClick={() => setIsEditing(true)} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium">
                      <Edit2 className="w-4 h-4" /> Sửa
                    </button>
                  )}
-                 {onCancel && appointment.status !== 'COMPLETED' && appointment.status !== 'CANCELLED' && (
-                    <button onClick={() => handleAction('cancel')} disabled={isLoading} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-medium"><Trash2 className="w-4 h-4" /> Hủy</button>
-                 )}
-                 <button onClick={onClose} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium">Đóng</button>
               </div>
             </div>
           )}

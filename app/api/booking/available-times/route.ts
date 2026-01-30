@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
        totalDuration += staffService?.duration ?? service.duration
     }
 
-    // Get salon timezone (fallback to Asia/Ho_Chi_Minh)
+    // Get salon timezone (fallback to Europe/Vienna)
     const salon = await prisma.salon.findUnique({
       where: { id: salonId },
       select: { timezone: true },

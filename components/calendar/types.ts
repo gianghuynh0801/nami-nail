@@ -22,6 +22,8 @@ export interface CalendarAppointment {
     name: string
     duration: number
   }
+  /** Danh sách dịch vụ (nhiều dịch vụ trong 1 lịch). Có thì dùng, không thì dùng service. */
+  services?: Array<{ id: string; name: string; duration: number }>
   staffId: string
   startTime: string  // ISO string
   endTime: string

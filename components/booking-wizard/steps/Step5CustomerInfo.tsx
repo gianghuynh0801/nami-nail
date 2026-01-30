@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { User, Phone, Mail, FileText, ChevronRight, ChevronLeft, AlertCircle } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import type { CustomerInfo } from '../types'
 
 interface Step5CustomerInfoProps {
@@ -17,17 +18,18 @@ export default function Step5CustomerInfo({
   onNext,
   onBack,
 }: Step5CustomerInfoProps) {
+  const t = useTranslations('BookingWizard')
   const [errors, setErrors] = useState<Partial<Record<keyof CustomerInfo, string>>>({})
 
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof CustomerInfo, string>> = {}
 
     if (!customerInfo.name.trim()) {
-      newErrors.name = 'Vui lòng nhập họ tên'
+      newErrors.name = t('pleaseEnterName')
     }
 
     if (!customerInfo.phone.trim()) {
-      newErrors.phone = 'Vui lòng nhập số điện thoại'
+      newErrors.phone = t('pleaseEnterPhone')
     } else if (!/^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]*$/.test(customerInfo.phone)) {
       // Very permissive regex: allows +, (), space, -, . and digits. 
       // User requested "no length limit", so we use * for the last group or just check for basic validity.
@@ -36,11 +38,11 @@ export default function Step5CustomerInfo({
       // New Regex: /^[+]?[\d\s\-\.\(\)]+$/
       // And maybe check if it has at least approx 5 digits? "no length limit" usually means "don't restrict to 10-11", avoiding excessively short ones is still good practice but I will stick to user request "no limit".
     } else if (!/^[+]?[\d\s\-\.\(\)]+$/.test(customerInfo.phone) || customerInfo.phone.replace(/\D/g, '').length < 3) {
-      newErrors.phone = 'Số điện thoại không hợp lệ'
+      newErrors.phone = t('invalidPhone')
     }
 
     if (customerInfo.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerInfo.email)) {
-      newErrors.email = 'Email không hợp lệ'
+      newErrors.email = t('invalidEmail')
     }
 
     setErrors(newErrors)
@@ -68,10 +70,10 @@ export default function Step5CustomerInfo({
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Thông tin Khách hàng
+          {t('customerInfoTitle')}
         </h2>
         <p className="text-gray-500">
-          Nhập thông tin để chúng tôi liên hệ với bạn
+          {t('customerInfoHint')}
         </p>
       </div>
 
@@ -81,13 +83,13 @@ export default function Step5CustomerInfo({
         <div>
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
             <User className="w-4 h-4 text-primary-500" />
-            Họ và tên <span className="text-red-500">*</span>
+            {t('fullName')} <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             value={customerInfo.name}
             onChange={(e) => handleChange('name', e.target.value)}
-            placeholder="Nhập họ và tên"
+            placeholder={t('enterFullName')}
             className={`
               w-full px-4 py-3 rounded-xl border transition-all
               ${errors.name 
@@ -109,13 +111,13 @@ export default function Step5CustomerInfo({
         <div>
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
             <Phone className="w-4 h-4 text-primary-500" />
-            Số điện thoại <span className="text-red-500">*</span>
+            {t('phone')} <span className="text-red-500">*</span>
           </label>
           <input
             type="tel"
             value={customerInfo.phone}
             onChange={(e) => handleChange('phone', e.target.value)}
-            placeholder="Nhập số điện thoại"
+            placeholder={t('enterPhone')}
             className={`
               w-full px-4 py-3 rounded-xl border transition-all
               ${errors.phone 
@@ -137,13 +139,13 @@ export default function Step5CustomerInfo({
         <div>
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
             <Mail className="w-4 h-4 text-primary-500" />
-            Email <span className="text-gray-400">(không bắt buộc)</span>
+            {t('emailOptional')}
           </label>
           <input
             type="email"
             value={customerInfo.email}
             onChange={(e) => handleChange('email', e.target.value)}
-            placeholder="Nhập email (không bắt buộc)"
+            placeholder={t('enterEmailOptional')}
             className={`
               w-full px-4 py-3 rounded-xl border transition-all
               ${errors.email 
@@ -165,12 +167,12 @@ export default function Step5CustomerInfo({
         <div>
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
             <FileText className="w-4 h-4 text-primary-500" />
-            Ghi chú <span className="text-gray-400">(không bắt buộc)</span>
+            {t('notesOptional')}
           </label>
           <textarea
             value={customerInfo.notes}
             onChange={(e) => handleChange('notes', e.target.value)}
-            placeholder="Ví dụ: Dị ứng với một số loại sơn, yêu cầu đặc biệt..."
+            placeholder={t('notesPlaceholderExample')}
             rows={3}
             className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-400 focus:border-primary-400 focus:outline-none transition-all resize-none"
           />
@@ -180,7 +182,7 @@ export default function Step5CustomerInfo({
       {/* Info Box */}
       <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
         <p className="text-sm text-blue-700">
-          💡 Số điện thoại sẽ được sử dụng để xác nhận lịch hẹn và liên hệ khi cần thiết.
+          💡 {t('phoneInfo')}
         </p>
       </div>
 
@@ -191,7 +193,7 @@ export default function Step5CustomerInfo({
           className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
         >
           <ChevronLeft className="w-5 h-5" />
-          Quay lại
+          {t('back')}
         </button>
         <button
           onClick={handleContinue}
@@ -204,7 +206,7 @@ export default function Step5CustomerInfo({
             }
           `}
         >
-          Tiếp tục
+          {t('continue')}
           <ChevronRight className="w-5 h-5" />
         </button>
       </div>

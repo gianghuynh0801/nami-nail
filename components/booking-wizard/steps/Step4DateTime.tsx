@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react'
 import { Calendar as CalendarIcon, Clock, ChevronRight, ChevronLeft, Edit2, RotateCcw } from 'lucide-react'
 import { parseISO, isValid } from 'date-fns'
-import { vi } from 'date-fns/locale'
+import { enUS, vi } from 'date-fns/locale'
+import { useLocale } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { salonDateLabel, salonTodayISO } from '@/lib/timezone'
 
 interface Step4DateTimeProps {
@@ -39,6 +41,9 @@ export default function Step4DateTime({
   onNext,
   onBack,
 }: Step4DateTimeProps) {
+  const locale = useLocale()
+  const t = useTranslations('BookingWizard')
+  const dateFnsLocale = locale === 'vi' ? vi : enUS
   const [availableTimes, setAvailableTimes] = useState<TimeSlot[]>([])
   const [loadingTimes, setLoadingTimes] = useState(false)
   const [noTimesReason, setNoTimesReason] = useState<string | null>(null)
@@ -197,10 +202,10 @@ export default function Step4DateTime({
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Chọn Ngày & Giờ
+          {t('selectDateAndTime')}
         </h2>
         <p className="text-gray-500">
-          Vui lòng chọn thời gian thích hợp cho bạn
+          {t('selectDateAndTimeHint')}
         </p>
       </div>
 
@@ -209,7 +214,7 @@ export default function Step4DateTime({
          <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                <CalendarIcon className="w-5 h-5 text-primary-500" />
-               Ngày đặt lịch
+               {t('bookingDate')}
             </h3>
             {!isEditingDate && (
                <button 
@@ -217,7 +222,7 @@ export default function Step4DateTime({
                   className="text-primary-600 text-sm font-medium hover:underline flex items-center gap-1"
                >
                   <Edit2 className="w-3 h-3" />
-                  Thay đổi
+                  {t('change')}
                </button>
             )}
          </div>
@@ -245,7 +250,7 @@ export default function Step4DateTime({
                onClick={() => setIsEditingDate(true)}
             >
                <div className="font-medium text-lg text-gray-900 capitalize">
-                  {selectedDate ? salonDateLabel(selectedDate, salonTimezone, 'EEEE, dd/MM/yyyy') : 'Chọn ngày'}
+                  {selectedDate ? salonDateLabel(selectedDate, salonTimezone, 'EEEE, dd/MM/yyyy') : t('selectDate')}
                </div>
                {/* Note: past-day warning is handled by min date; keep UI simple */}
             </div>
@@ -258,7 +263,7 @@ export default function Step4DateTime({
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-gray-900 flex items-center gap-2">
               <Clock className="w-5 h-5 text-primary-500" />
-              Chọn giờ - {selectedDate ? salonDateLabel(selectedDate, salonTimezone, 'dd/MM/yyyy') : ''}
+              {t('selectTimeLabel')} - {selectedDate ? salonDateLabel(selectedDate, salonTimezone, 'dd/MM/yyyy') : ''}
             </h3>
             {hasPreselectedTime && selectedTime && !isEditingTime && (
               <button 
@@ -290,7 +295,7 @@ export default function Step4DateTime({
             </div>
           ) : availableTimes.length === 0 && !customTime ? (
             <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg">
-               <p>{noTimesReason || 'Không có giờ trống'}</p>
+               <p>{noTimesReason || t('noSlotsAvailable')}</p>
             </div>
           ) : (
             <>
@@ -346,7 +351,7 @@ export default function Step4DateTime({
           className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
         >
           <ChevronLeft className="w-5 h-5" />
-          Quay lại
+          {t('back')}
         </button>
         <button
           onClick={handleContinue}
@@ -359,7 +364,7 @@ export default function Step4DateTime({
             }
           `}
         >
-          Tiếp tục
+          {t('continue')}
           <ChevronRight className="w-5 h-5" />
         </button>
       </div>
