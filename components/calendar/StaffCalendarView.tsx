@@ -12,6 +12,8 @@ import NotificationCenter from "./NotificationCenter";
 import CurrentTimeLine from "./CurrentTimeLine";
 import AppointmentDetailModal from "./AppointmentDetailModal";
 
+import { useSalonContext } from "@/contexts/SalonContext";
+import { salonTodayISO } from "@/lib/timezone";
 import { useCalendarData } from "./hooks/useCalendarData";
 import { useCalendarDragDrop } from "./hooks/useCalendarDragDrop";
 import { useAutoScroll } from "./hooks/useAutoScroll";
@@ -42,6 +44,9 @@ export default function StaffCalendarView({
     useState<CalendarAppointment | null>(null);
   const [selectedStaffName, setSelectedStaffName] = useState("");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const { salons } = useSalonContext();
+  const salon = salons.find((s) => s.id === salonId);
+  const salonTimezone = salon?.timezone;
 
   const {
     staff,
@@ -91,7 +96,7 @@ export default function StaffCalendarView({
   const handleToday = () => setSelectedDate(new Date());
 
   const isToday =
-    format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+    format(selectedDate, "yyyy-MM-dd") === salonTodayISO(salonTimezone);
 
   // Handle assign from waiting list
   const handleAssignFromWaitingList = useCallback(
@@ -369,6 +374,7 @@ export default function StaffCalendarView({
                   ))}
 
                   {/* Current Time Line */}
+                  {/* Luôn dùng múi giờ mặc định (Europe/Vienna) cho đường đỏ giờ hiện tại */}
                   {isToday && <CurrentTimeLine />}
                 </div>
               </div>

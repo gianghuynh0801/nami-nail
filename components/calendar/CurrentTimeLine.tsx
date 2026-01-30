@@ -1,16 +1,24 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { formatInTimeZone } from "date-fns-tz";
+import { getSalonTz } from "@/lib/timezone";
 import { CALENDAR_CONFIG } from "./constants";
 
-export default function CurrentTimeLine() {
+interface CurrentTimeLineProps {
+  /** Salon timezone (e.g. Europe/Vienna). Red line shows current time in this zone. */
+  timezone?: string | null;
+}
+
+export default function CurrentTimeLine({ timezone }: CurrentTimeLineProps) {
   const [position, setPosition] = useState(0);
+  const tz = getSalonTz(timezone);
 
   useEffect(() => {
     const updatePosition = () => {
       const now = new Date();
-      const hours = now.getHours();
-      const minutes = now.getMinutes();
+      const hours = parseInt(formatInTimeZone(now, tz, "H"), 10);
+      const minutes = parseInt(formatInTimeZone(now, tz, "m"), 10);
       const totalMinutes = hours * 60 + minutes;
       const pos = (totalMinutes / 60) * CALENDAR_CONFIG.HOUR_HEIGHT;
       setPosition(pos);
@@ -20,7 +28,7 @@ export default function CurrentTimeLine() {
     const interval = setInterval(updatePosition, 60000); // Update every minute
 
     return () => clearInterval(interval);
-  }, []);
+  }, [tz]);
 
   return (
     <div

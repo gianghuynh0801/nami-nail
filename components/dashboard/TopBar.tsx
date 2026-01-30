@@ -11,8 +11,9 @@ import {
   Building2,
   Languages,
 } from "lucide-react";
-import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { useState, useEffect } from "react";
+import { DEFAULT_SALON_TIMEZONE } from "@/lib/timezone";
 import { BookingWizardModal } from "@/components/booking-wizard";
 import { useSalonContext } from "@/contexts/SalonContext";
 import { useLocale, useTranslations } from "next-intl";
@@ -51,9 +52,11 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
     return () => clearInterval(timer);
   }, []);
 
-  const time = currentTime ? format(currentTime, "HH:mm") : "--:--";
+  // Luôn dùng múi giờ Áo (Europe/Vienna) cho giờ hiển thị
+  const tz = DEFAULT_SALON_TIMEZONE;
+  const time = currentTime ? formatInTimeZone(currentTime, tz, "HH:mm") : "--:--";
   const date = currentTime
-    ? format(currentTime, "MMM dd, yyyy")
+    ? formatInTimeZone(currentTime, tz, "MMM dd, yyyy")
     : "-- --, ----";
 
   return (
